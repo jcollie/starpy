@@ -326,8 +326,10 @@ class AMIProtocol(basic.LineOnlyReceiver):
         returns the actionid for the message
         """
         if type(message) == list:
-            actionid = next((value for header, value in message
-                             if str(header.lower()) == 'actionid'), None)
+            actionid = None
+            for header, value in message:
+                if str(header.lower()) == 'actionid':
+                    actionid = value
             if actionid is None:
                 actionid = self.generateActionId()
                 message.append(['actionid', str(actionid)])
@@ -697,7 +699,7 @@ class AMIProtocol(basic.LineOnlyReceiver):
     def originate(
             self, channel, context=None, exten=None, priority=None,
             timeout=None, callerid=None, account=None, application=None,
-            data=None, variable={}, async=False, channelid=None,
+            data=None, variable={}, async=False, actionid=None, channelid=None,
 			otherchannelid=None
         ):
         """Originate call to connect channel to given context/exten/priority
@@ -725,6 +727,7 @@ class AMIProtocol(basic.LineOnlyReceiver):
             ('application', application),
             ('data', data),
             ('async', str(async)),
+            ('actionid', actionid),
             ('channelid', channelid),
             ('otherchannelid', otherchannelid),
         ) if v is not None]
