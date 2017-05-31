@@ -71,9 +71,9 @@ class AMIProtocol(LineOnlyReceiver):
     amiVersion = None
     id = None
 
-    def __init__(self, reactor, *args, **named):
+    def __init__(self, factory, *args, **named):
         """Initialise the AMIProtocol, arguments are ignored"""
-        self.reactor = reactor
+        self.factory = factory
         self.messageCache = []
         self.actionIDCallbacks = {}
         self.eventTypeCallbacks = {}
@@ -1155,7 +1155,7 @@ class AMIFactory(ReconnectingClientFactory):
     def buildProtocol(self, addr):
         self.log.debug('Connected to {addr:}', addr = addr)
         self.resetDelay()
-        return AMIProtocol(self.reactor)
+        return AMIProtocol(self)
 
     def clientConnectionFailed(self, connector, reason):
         """Connection failed, report to our callers"""
