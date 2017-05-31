@@ -1121,7 +1121,7 @@ class AMIProtocol(basic.LineOnlyReceiver):
 class AMIFactory(protocol.ReconnectingClientFactory):
     """A factory for AMI protocols
     """
-    protocol = AMIProtocol
+    log = Logger()
 
     def __init__(self, reactor, username, secret, id=None, plaintext_login=True, on_reconnect=None):
         self.reactor = reactor
