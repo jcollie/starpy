@@ -69,11 +69,10 @@ class AMIProtocol(LineOnlyReceiver):
     log = Logger()
 
     count = 0
-    amiVersion = None
-    id = None
 
     def __init__(self, factory):
         self.factory = factory
+        self.amiVersion = None
         self.messageCache = []
         self.actionIDCallbacks = {}
         self.eventTypeCallbacks = {}
@@ -1121,6 +1120,7 @@ class AMIService(object):
                  plaintext_login = True, on_connected = None):
         self.reactor = reactor
         self.username = username
+        self.secret = secret
         self.hostname = hostname
         self.port = port
         self.tls = tls
