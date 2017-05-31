@@ -123,6 +123,7 @@ class FastAGIProtocol(basic.LineOnlyReceiver):
     def lineReceived(self, line):
         """(Internal) Handle Twisted's report of an incoming line from AMI"""
         self.log.debug('Line In: {line:}', line = repr(line))
+        line = line.decode('utf-8')
         if self.readingVariables:
             if not line.strip():
                 self.readingVariables = False
