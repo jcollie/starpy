@@ -1137,12 +1137,12 @@ class AMIFactory(Factory):
 
         #return self.loginDefer
 
-    def startedConnecting(self, connector):
-        self.log.debug('started to connect')
+    #def startedConnecting(self, connector):
+    #    self.log.debug('started to connect')
 
     def buildProtocol(self, addr):
         self.log.debug('Connected to {addr:}', addr = addr)
-        self.resetDelay()
+        #self.resetDelay()
         return AMIProtocol(self)
 
     #def clientConnectionFailed(self, connector, reason):
