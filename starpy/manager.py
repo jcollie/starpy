@@ -27,14 +27,14 @@ import socket
 from hashlib import md5
 
 from twisted.application.internet import ClientService
-from twisted.internet.defer import Deferred
 from twisted.internet import endpoints
+from twisted.internet.defer import Deferred
 from twisted.internet.error import ConnectionDone
-#from twisted.internet.protocol import ReconnectingClientFactory
 from twisted.internet.protocol import Factory
 from twisted.logger import Logger
 from twisted.protocols.basic import LineOnlyReceiver
 from twisted.python.failure import Failure
+
 from starpy import error
 
 class deferredErrorResp(Deferred):
@@ -72,8 +72,7 @@ class AMIProtocol(LineOnlyReceiver):
     amiVersion = None
     id = None
 
-    def __init__(self, factory, *args, **named):
-        """Initialise the AMIProtocol, arguments are ignored"""
+    def __init__(self, factory)
         self.factory = factory
         self.messageCache = []
         self.actionIDCallbacks = {}
@@ -186,7 +185,7 @@ class AMIProtocol(LineOnlyReceiver):
         XXX Should probably use proper Twisted-style credential negotiations
         """
         self.log.info('connection made')
-        if self.factory.plaintext_login:
+        if self.factory.service.plaintext_login:
             df = self.login()
         else:
             df = self.loginChallengeResponse()
@@ -199,8 +198,8 @@ class AMIProtocol(LineOnlyReceiver):
 
             else:
                 self.log.info('Login complete: {message:}', message = message)
-                if self.factory.on_connected is not None:
-                    self.factory.on_connected(self)
+                if self.factory.service.on_connected is not None:
+                    self.factory.service.on_connected(self)
 
         def onFailure(failure):
             """Handle failure to connect (e.g. due to timeout)"""
@@ -596,13 +595,11 @@ class AMIProtocol(LineOnlyReceiver):
 
     def login(self):
         """Log into the AMI interface (done automatically on connection)
-
-        Uses factory.username and factory.secret
         """
         return self.sendDeferred({
             'action': 'login',
-            'username': self.factory.username,
-            'secret': self.factory.secret,
+            'username': self.factory.service.username,
+            'secret': self.factory.service.secret,
         }).addCallback(self.errorUnlessResponse)
 
     def loginChallengeResponse(self):
@@ -615,11 +612,11 @@ class AMIProtocol(LineOnlyReceiver):
         def sendResponse(challenge):
             if not type(challenge) is dict or not 'challenge' in challenge:
                 raise error.AMICommandFailure(challenge)
-            key_value = md5('{}{}'.format(challenge['challenge'], self.factory.secret)).hexdigest()
+            key_value = md5('{}{}'.format(challenge['challenge'], self.factory.service.secret)).hexdigest()
             return self.sendDeferred({
                 'action': 'Login',
                 'authtype': 'MD5',
-                'username': self.factory.username,
+                'username': self.factory.service.username,
                 'key': key_value,
             }).addCallback(self.errorUnlessResponse)
         return self.sendDeferred({
@@ -1111,44 +1108,28 @@ class AMIFactory(Factory):
     """
     log = Logger()
 
-    def __init__(self, reactor, username, secret, plaintext_login = True, on_connected = None):
-        self.reactor = reactor
-        self.username = username
-        self.secret = secret
-        self.plaintext_login = plaintext_login
-        self.on_connected = on_connected
-
-    def login(self, ip = 'localhost', port = 5038, timeout = 5, bindAddress = None):
-        """Connect and return protocol instance
-
-        Connect and return our (singleton) protocol instance with login
-        completed.
-
-        XXX This is messy, we'd much rather have the factory able to create
-        large numbers of protocols simultaneously
-        """
-        #self.loginDefer = defer.Deferred()
-        #self.reactor.connectTCP(ip, port, self, timeout = timeout,
-        #                        bindAddress = bindAddress)
-        self.endpoint = endpoints.clientFromString(self.reactor,
-                                                   'tcp:host={}:port={}'.format(ip, port))
-        self.service = ClientService(self.endpoint, self)
-        self.service.startService()
-
-        #return self.loginDefer
-
-    #def startedConnecting(self, connector):
-    #    self.log.debug('started to connect')
+    def __init__(self, service):
+        self.service = service
 
     def buildProtocol(self, addr):
         self.log.debug('Connected to {addr:}', addr = addr)
-        #self.resetDelay()
         return AMIProtocol(self)
 
-    #def clientConnectionFailed(self, connector, reason):
-    #    self.log.info('connection failed, reconnecting...')
-    #    ReconnectingClientFactory.clientConnectionLost(self, connector, reason)
+class AMIService(object):
+    def __init__(self, reactor, username, secret,
+                 hostname = 'localhost', port = 5038, tls = False,
+                 plaintext_login = True, on_connected = None):
+        self.reactor = reactor
+        self.username = username
+        self.hostname = hostname
+        self.port = port
+        self.tls = tls
+        self.plaintext_login = plaintext_login
+        self.on_connected = on_connected
 
-    #def clientConnectionLost(self, connector, reason):
-    #    self.log.info('connection lost, reconnecting...')
-    #    ReconnectingClientFactory.clientConnectionFailed(self, connector, reason)
+        self.factory = AMIFactory(self)
+        self.endpoint = endpoints.clientFromString(self.reactor,
+                                                   'tcp:host={}:port={}'.format(self.hostname, self.port))
+        self.service = ClientService(self.endpoint, self.factory)
+        self.service.setName('Asterisk Manager Interface')
+        self.service.startService()
