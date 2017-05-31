@@ -163,7 +163,7 @@ class FastAGIProtocol(basic.LineOnlyReceiver):
         commandString = commandString.rstrip('\n').rstrip('\r')
         df = defer.Deferred()
         self.pendingMessages.append(df)
-        self.sendLine(commandString)
+        self.sendLine(commandString.encode('utf-8'))
         return df
 
     def checkFailure(self, result, failure='-1'):
