@@ -25,6 +25,7 @@ import sys
 from twisted.internet import protocol, reactor, defer
 from twisted.protocols import basic
 from twisted.internet import error as tw_error
+from twisted.internet import endpoints
 from twisted.logger import Logger
 import socket
 import logging
@@ -620,7 +621,7 @@ class AMIProtocol(basic.LineOnlyReceiver):
         def sendResponse(challenge):
             if not type(challenge) is dict or not 'challenge' in challenge:
                 raise error.AMICommandFailure(challenge)
-            key_value = md5('%s%s' % (challenge['challenge'], self.factory.secret)).hexdigest()
+            key_value = md5('{}{}'.format(challenge['challenge'], self.factory.secret)).hexdigest()
             return self.sendDeferred({
                 'action': 'Login',
                 'authtype': 'MD5',
