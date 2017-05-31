@@ -1164,7 +1164,7 @@ class AMIFactory(ReconnectingClientFactory):
         #self.reconnect(connector)
         ReconnectingClientFactory.clientConnectionLost(self, connector, reason)
 
-    def clientConnectionLost(self, connector, unused_reason):
+    def clientConnectionLost(self, connector, reason):
         """Connection lost, re-build the login connection"""
         self.log.info('connection lost, reconnecting...')
         #self.log.debug(self.on_reconnect)
