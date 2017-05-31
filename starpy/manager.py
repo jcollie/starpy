@@ -26,7 +26,6 @@ from twisted.internet import defer
 from twisted.internet import endpoints
 from twisted.internet import error as tw_error
 from twisted.internet import protocol
-from twisted.internet import reactor
 from twisted.logger import Logger
 from twisted.protocols import basic
 from twisted.python.failure import Failure
@@ -72,8 +71,9 @@ class AMIProtocol(basic.LineOnlyReceiver):
     amiVersion = None
     id = None
 
-    def __init__(self, *args, **named):
+    def __init__(self, reactor, *args, **named):
         """Initialise the AMIProtocol, arguments are ignored"""
+        self.reactor = reactor
         self.messageCache = []
         self.actionIDCallbacks = {}
         self.eventTypeCallbacks = {}
@@ -1141,24 +1141,35 @@ class AMIFactory(protocol.ReconnectingClientFactory):
         large numbers of protocols simultaneously
         """
         self.loginDefer = defer.Deferred()
-        #reactor.connectTCP(ip, port, self, timeout=timeout,
-        #                   bindAddress=bindAddress)
-        ami_endpoint = endpoints.clientFromString(self.reactor,
-                                                       'tcp:host={}:port={}'.format(ip, port))
-        ami_endpoint.connect(self)
+        self.reactor.connectTCP(ip, port, self, timeout = timeout,
+                                bindAddress = bindAddress)
+        #ami_endpoint = endpoints.clientFromString(self.reactor,
+        #                                               'tcp:host={}:port={}'.format(ip, port))
+        #ami_endpoint.connect(self)
 
         return self.loginDefer
 
+    def startedConnecting(self, connector):
+        self.log.debug('started to connect')
+
+    def buildProtocol(self, addr):
+        self.log.debug('Connected to {addr:}', addr = addr)
+        self.resetDelay()
+        return AMIProtocol(self.reactor)
+
     def clientConnectionFailed(self, connector, reason):
         """Connection failed, report to our callers"""
+        self.log.info('connection failed, reconnecting...')
         self.loginDefer.errback(reason)
-        self.reconnect(connector)
+        #self.reconnect(connector)
+        ReconnectingClientFactory.clientConnectionLost(self, connector, reason)
 
     def clientConnectionLost(self, connector, unused_reason):
         """Connection lost, re-build the login connection"""
         self.log.info('connection lost, reconnecting...')
         #self.log.debug(self.on_reconnect)
-        self.reconnect(connector)
+        #self.reconnect(connector)
+        ReconnectingClientFactory.clientConnectionFailed(self, connector, reason)
 
     def reconnect(self, connector):
         self.retry(connector)
