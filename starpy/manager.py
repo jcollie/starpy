@@ -22,19 +22,20 @@ for basic control of the channels active on a given Asterisk server.
 """
 
 import sys
+from twisted.internet import defer
+from twisted.internet import endpoints
+from twisted.internet import error as tw_error
 from twisted.internet import protocol
 from twisted.internet import reactor
-from twisted.internet import defer
-from twisted.protocols import basic
-from twisted.internet import error as tw_error
-from twisted.internet import endpoints
 from twisted.logger import Logger
+from twisted.protocols import basic
+from twisted.python.failure import Failure
 import socket
-import logging
+#import logging
 from hashlib import md5
 from starpy import error
 
-log = logging.getLogger('AMI')
+#log = logging.getLogger('AMI')
 
 class deferredErrorResp(defer.Deferred):
     """A subclass of defer.Deferred that adds a registerError method
@@ -170,7 +171,7 @@ class AMIProtocol(basic.LineOnlyReceiver):
 
     def lineReceived(self, line):
         """Handle Twisted's report of an incoming line from the manager"""
-        log.debug('Line In: %r', line)
+        self.log.debug('Line In: {line:}', line = line)
         self.messageCache.append(line)
         if not line.strip():
             self.dispatchIncoming()  # does dispatch and clears cache
@@ -258,8 +259,8 @@ class AMIProtocol(basic.LineOnlyReceiver):
                         except ValueError as err:
                             # XXX data-safety issues, what prevents the
                             # VERSION_PREFIX from showing up in a data-set?
-                            log.warn("Improperly formatted line received and "
-                                     "ignored: %r", line)
+                            self.log.warn("Improperly formatted line received and "
+                                          "ignored: {line:}", line = repr(line))
                         else:
                             message[key.lower().strip()] = value.strip()
         self.log.debug('Incoming Message: {message:}', message = message)
@@ -270,8 +271,8 @@ class AMIProtocol(basic.LineOnlyReceiver):
                 try:
                     callback(message)
                 except Exception as err:
-                    # XXX log failure here...
-                    pass
+                    self.log.failure('exception in callback', failure = Failure(err))
+
         # otherwise is a monitor message or something we didn't send...
         if 'event' in message:
             self.dispatchEvent(message)
@@ -351,7 +352,7 @@ class AMIProtocol(basic.LineOnlyReceiver):
                 message.append(['actionid', str(actionid)])
             if responseCallback:
                 self.actionIDCallbacks[actionid] = responseCallback
-            log.debug("""MSG OUT: %s""", message)
+            self.log.debug('MSG OUT: {message:}', message = message)
             for item in message:
                 line = ('%s: %s' % (str(item[0].lower()), str(item[1])))
                 self.sendLine(line.encode('utf-8'))
@@ -361,9 +362,9 @@ class AMIProtocol(basic.LineOnlyReceiver):
                 message['actionid'] = self.generateActionId()
             if responseCallback:
                 self.actionIDCallbacks[message['actionid']] = responseCallback
-            log.debug("""MSG OUT: %s""", message)
+            self.log.debug('MSG OUT: {message:}', message = message)
             for key, value in message.items():
-                line = ('%s: %s' % (str(key.lower()), str(value)))
+                line = ('{}: {}'.format(str(key.lower()), str(value)))
                 self.sendLine(line.encode('utf-8'))
         self.sendLine(''.encode('utf-8'))
         if type(message) == list:
@@ -1155,8 +1156,8 @@ class AMIFactory(protocol.ReconnectingClientFactory):
 
     def clientConnectionLost(self, connector, unused_reason):
         """Connection lost, re-build the login connection"""
-        log.info('connection lost, reconnecting...')
-        log.debug(self.on_reconnect)
+        self.log.info('connection lost, reconnecting...')
+        #self.log.debug(self.on_reconnect)
         self.reconnect(connector)
 
     def reconnect(self, connector):
