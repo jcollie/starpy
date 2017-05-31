@@ -1,9 +1,12 @@
+# -*- mode: python; coding: utf-8 -*-
 #
 # StarPy -- Asterisk Protocols for Twisted
 #
-# Copyright (c) 2006, Michael C. Fletcher
+# Copyright © 2006, Michael C. Fletcher
+# Copyright © 2107, Jeffrey C. Ollie
 #
 # Michael C. Fletcher <mcfletch@vrplumber.com>
+# Jeffrey C. Ollie <jeff@ocjtech.us>
 #
 # See http://asterisk-org.github.com/starpy/ for more information about the
 # StarPy project. Please do not directly contact any of the maintainers of this
@@ -27,15 +30,15 @@ import socket
 from hashlib import md5
 
 from twisted.application.internet import ClientService
-from twisted.internet import endpoints
 from twisted.internet.defer import Deferred
+from twisted.internet.endpoints import clientFromString
 from twisted.internet.error import ConnectionDone
 from twisted.internet.protocol import Factory
 from twisted.logger import Logger
 from twisted.protocols.basic import LineOnlyReceiver
 from twisted.python.failure import Failure
 
-from starpy import error
+from starpy.error import AMICommandFailure
 
 class deferredErrorResp(Deferred):
     """A subclass of Deferred that adds a registerError method
@@ -370,7 +373,7 @@ class AMIProtocol(LineOnlyReceiver):
 
         def onEvent(event):
             if event.get('response') == 'Error':
-                df.errback(error.AMICommandFailure(event))
+                df.errback(AMICommandFailure(event))
             elif event.get('event') == stopEvent:
                 cache.append(event)
                 df.callback(cache)
@@ -390,7 +393,7 @@ class AMIProtocol(LineOnlyReceiver):
         If == expected, returns the message
         """
         if type(message) is dict and message['response'] != expected:
-            raise error.AMICommandFailure(message)
+            raise AMICommandFailure(message)
         return message
 
     ## End-user API
@@ -564,7 +567,7 @@ class AMIProtocol(LineOnlyReceiver):
             elif 'value' in message:
                 value = message['value']
             else:
-                raise error.AMICommandFailure(message)
+                raise AMICommandFailure(message)
             if value == '(null)':
                 value = None
             return value
@@ -610,7 +613,7 @@ class AMIProtocol(LineOnlyReceiver):
         """
         def sendResponse(challenge):
             if not type(challenge) is dict or not 'challenge' in challenge:
-                raise error.AMICommandFailure(challenge)
+                raise AMICommandFailure(challenge)
             key_value = md5('{}{}'.format(challenge['challenge'], self.factory.service.secret)).hexdigest()
             return self.sendDeferred({
                 'action': 'Login',
@@ -1128,8 +1131,8 @@ class AMIService(object):
         self.on_connected = on_connected
 
         self.factory = AMIFactory(self)
-        self.endpoint = endpoints.clientFromString(self.reactor,
-                                                   'tcp:host={}:port={}'.format(self.hostname, self.port))
+        self.endpoint = clientFromString(self.reactor,
+                                         'tcp:host={}:port={}'.format(self.hostname, self.port))
         self.service = ClientService(self.endpoint, self.factory)
         self.service.setName('Asterisk Manager Interface')
         self.service.startService()

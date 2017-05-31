@@ -1,9 +1,12 @@
+# -*- mode: python; coding: utf-8 -*-
 #
 # StarPy -- Asterisk Protocols for Twisted
 #
-# Copyright (c) 2006, Michael C. Fletcher
+# Copyright © 2006, Michael C. Fletcher
+# Copyright © 2107, Jeffrey C. Ollie
 #
 # Michael C. Fletcher <mcfletch@vrplumber.com>
+# Jeffrey C. Ollie <jeff@ocjtech.us>
 #
 # See http://asterisk-org.github.com/starpy/ for more information about the
 # StarPy project. Please do not directly contact any of the maintainers of this
@@ -28,7 +31,7 @@ Module defines a standard Python logging module log 'FastAGI'
 from twisted.internet import protocol
 from twisted.internet import reactor
 from twisted.internet import defer
-from twisted.internet import error as tw_error
+from twisted.internet.error import ConnectionDone
 from twisted.protocols import basic
 from twisted.logger import Logger
 
@@ -104,7 +107,7 @@ class FastAGIProtocol(basic.LineOnlyReceiver):
         self.log.info('Connection lost')
         try:
             for df in self.pendingMessages:
-                df.errback(tw_error.ConnectionDone(
+                df.errback(ConnectionDone(
                         "FastAGI connection lost"))
         finally:
             if self.lostConnectionDeferred:
