@@ -218,7 +218,7 @@ class AMIProtocol(LineOnlyReceiver):
                                callable = callable, err = err)
         self.actionIDCallbacks.clear()
         self.eventTypeCallbacks.clear()
-        #self.factory.clientConnectionLost(
+        self.factory.clientConnectionLost(None, reason)
 
     VERSION_PREFIX = 'Asterisk Call Manager'
     END_DATA = '--END COMMAND--'
@@ -342,7 +342,7 @@ class AMIProtocol(LineOnlyReceiver):
                 message.append(['actionid', str(actionid)])
             if responseCallback:
                 self.actionIDCallbacks[actionid] = responseCallback
-            self.log.debug('MSG OUT: {message:}', message = message)
+            #self.log.debug('MSG OUT: {message:}', message = message)
             for item in message:
                 line = ('%s: %s' % (str(item[0].lower()), str(item[1])))
                 self.sendLine(line.encode('utf-8'))
@@ -352,7 +352,7 @@ class AMIProtocol(LineOnlyReceiver):
                 message['actionid'] = self.generateActionId()
             if responseCallback:
                 self.actionIDCallbacks[message['actionid']] = responseCallback
-            self.log.debug('MSG OUT: {message:}', message = message)
+            #self.log.debug('MSG OUT: {message:}', message = message)
             for key, value in message.items():
                 line = ('{}: {}'.format(str(key.lower()), str(value)))
                 self.sendLine(line.encode('utf-8'))
