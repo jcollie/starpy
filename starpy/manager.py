@@ -22,6 +22,10 @@ for basic control of the channels active on a given Asterisk server.
 """
 
 import sys
+import socket
+
+from hashlib import md5
+
 from twisted.internet.defer import Deferred
 from twisted.internet import endpoints
 from twisted.internet.error import ConnectionDone
@@ -29,12 +33,7 @@ from twisted.internet.protocol import ReconnectingClientFactory
 from twisted.logger import Logger
 from twisted.protocols.basic import LineOnlyReceiver
 from twisted.python.failure import Failure
-import socket
-#import logging
-from hashlib import md5
 from starpy import error
-
-#log = logging.getLogger('AMI')
 
 class deferredErrorResp(Deferred):
     """A subclass of Deferred that adds a registerError method
@@ -124,8 +123,8 @@ class AMIProtocol(LineOnlyReceiver):
 
         Multiple functions may be registered for a given event
         """
-        self.log.debug('Registering function {function:} to handle events of type {event:}',
-                       function = function, event = event)
+        #self.log.debug('Registering function {function:} to handle events of type {event:}',
+        #               function = function, event = event)
         types = [str, type(None)]
         if sys.version_info <= (3, 0):
             types.append(unicode)
@@ -143,8 +142,8 @@ class AMIProtocol(LineOnlyReceiver):
 
         returns success boolean
         """
-        self.log.debug('Deregistering handler {function:} for events of type {event:}',
-                       function = function, event = event)
+        #self.log.debug('Deregistering handler {function:} for events of type {event:}',
+        #               function = function, event = event)
         types = [str, type(None)]
         if sys.version_info <= (3, 0):
             types.append(unicode)
@@ -171,7 +170,7 @@ class AMIProtocol(LineOnlyReceiver):
 
     def lineReceived(self, line):
         """Handle Twisted's report of an incoming line from the manager"""
-        self.log.debug('Line in: {line:}', line = repr(line))
+        #self.log.debug('Line in: {line:}', line = repr(line))
         self.messageCache.append(line.decode('utf-8'))
         if not line.strip():
             self.dispatchIncoming()  # does dispatch and clears cache
@@ -210,6 +209,7 @@ class AMIProtocol(LineOnlyReceiver):
 
     def connectionLost(self, reason):
         """Connection lost, clean up callbacks"""
+        self.log.info('Connection lost')
         for key, callable in self.actionIDCallbacks.items():
             try:
                 callable(ConnectionDone("FastAGI connection terminated"))
@@ -218,6 +218,7 @@ class AMIProtocol(LineOnlyReceiver):
                                callable = callable, err = err)
         self.actionIDCallbacks.clear()
         self.eventTypeCallbacks.clear()
+        self.factory.clientConnectionLost(
 
     VERSION_PREFIX = 'Asterisk Call Manager'
     END_DATA = '--END COMMAND--'
@@ -252,7 +253,7 @@ class AMIProtocol(LineOnlyReceiver):
                                           "ignored: {line:}", line = repr(line))
                         else:
                             message[key.lower().strip()] = value.strip()
-        self.log.debug('Incoming message: {message:}', message = repr(message))
+        #self.log.debug('Incoming message: {message:}', message = repr(message))
         if 'actionid' in message:
             key = message['actionid']
             callback = self.actionIDCallbacks.get(key)
@@ -296,7 +297,7 @@ class AMIProtocol(LineOnlyReceiver):
         protocol handles the management of them automatically.
         """
         self.count += 1
-        return '%s-%s-%s' % (self.hostName, id(self), self.count)
+        return '{}-{}-{}'.format(self.hostName, id(self), self.count)
 
     def sendDeferred(self, message):
         """Send with a single-callback deferred object
