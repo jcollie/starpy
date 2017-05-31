@@ -22,9 +22,9 @@ for basic control of the channels active on a given Asterisk server.
 """
 
 import sys
-from twisted.internet import defer
+from twisted.internet.defer import Deferred
 from twisted.internet import endpoints
-from twisted.internet import error as tw_error
+from twisted.internet.error import ConnectionDone
 from twisted.internet.protocol import ReconnectingClientFactory
 from twisted.logger import Logger
 from twisted.protocols.basic import LineOnlyReceiver
@@ -36,8 +36,8 @@ from starpy import error
 
 #log = logging.getLogger('AMI')
 
-class deferredErrorResp(defer.Deferred):
-    """A subclass of defer.Deferred that adds a registerError method
+class deferredErrorResp(Deferred):
+    """A subclass of Deferred that adds a registerError method
     to handle function callback when an Error response happens"""
     _errorRespCallback = None
     log = Logger()
@@ -221,8 +221,7 @@ class AMIProtocol(LineOnlyReceiver):
         """Connection lost, clean up callbacks"""
         for key, callable in self.actionIDCallbacks.items():
             try:
-                callable(tw_error.ConnectionDone(
-                         "FastAGI connection terminated"))
+                callable(ConnectionDone("FastAGI connection terminated"))
             except Exception as err:
                 self.log.error("Failure during connectionLost for callable {callable:}: {err:}",
                           callable = callable, err = err)
@@ -377,7 +376,7 @@ class AMIProtocol(LineOnlyReceiver):
 
         returns deferred returning sequence of events/responses
         """
-        df = defer.Deferred()
+        df = Deferred()
         cache = []
 
         def onEvent(event):
@@ -494,7 +493,7 @@ class AMIProtocol(LineOnlyReceiver):
 
     def dbGet(self, family, key):
         """This action retrieves a value from the AstDB database"""
-        df = defer.Deferred()
+        df = Deferred()
 
         def extractValue(ami, event):
             value = event['val']
@@ -1172,6 +1171,6 @@ class AMIFactory(ReconnectingClientFactory):
 
     def reconnect(self, connector):
         self.retry(connector)
-        #self.loginDefer = defer.Deferred()
+        #self.loginDefer = Deferred()
         #if self.on_reconnect:
         #    self.on_reconnect(self.loginDefer)
