@@ -19,18 +19,16 @@
 The Asterisk Manager Interface is a simple line-oriented protocol that allows
 for basic control of the channels active on a given Asterisk server.
 
-Module defines a standard Python logging module log 'AMI'
 """
 
 import sys
 from twisted.internet import protocol, reactor, defer
 from twisted.protocols import basic
 from twisted.internet import error as tw_error
+from twisted.logger import Logger
 import socket
-import logging
 from hashlib import md5
 from starpy import error
-
 
 log = logging.getLogger('AMI')
 
@@ -61,6 +59,8 @@ class AMIProtocol(basic.LineOnlyReceiver):
         messageCache -- stores incoming message fragments from the manager
         id -- An identifier for this instance
     """
+    log = Logger()
+
     count = 0
     amiVersion = None
     id = None
@@ -117,8 +117,8 @@ class AMIProtocol(basic.LineOnlyReceiver):
 
         Multiple functions may be registered for a given event
         """
-        log.debug('Registering function %s to handle events of type %r',
-                  function, event)
+        self.log.debug('Registering function {function:} to handle events of type {event:}',
+                       function = function, event = event)
         types = [str, type(None)]
         if sys.version_info <= (3, 0):
             types.append(unicode)
@@ -136,8 +136,8 @@ class AMIProtocol(basic.LineOnlyReceiver):
 
         returns success boolean
         """
-        log.debug('Deregistering handler %s for events of type %r',
-                  function, event)
+        self.log.debug('Deregistering handler {function:} for events of type {event:}',
+                       function = function, event = event)
         types = [str, type(None)]
         if sys.version_info <= (3, 0):
             types.append(unicode)
@@ -177,7 +177,7 @@ class AMIProtocol(basic.LineOnlyReceiver):
 
         XXX Should probably use proper Twisted-style credential negotiations
         """
-        log.info('Connection Made')
+        self.log.info('Connection Made')
         self.factory.resetDelay()
         if self.factory.plaintext_login:
             df = self.login()
@@ -187,7 +187,7 @@ class AMIProtocol(basic.LineOnlyReceiver):
         def onComplete(message):
             """Check for success, errback or callback as appropriate"""
             if not message['response'] == 'Success':
-                log.info('Login Failure: %s', message)
+                self.log.info('Login Failure: {message:}', message = message)
                 self.transport.loseConnection()
                 self.factory.loginDefer.errback(
                     error.AMICommandFailure("Unable to connect to manager",
@@ -196,14 +196,14 @@ class AMIProtocol(basic.LineOnlyReceiver):
             else:
                 # XXX messy here, would rather have the factory trigger its own
                 # callback...
-                log.info('Login Complete: %s', message)
+                self.log.info('Login Complete: {message:}', message)
                 self.factory.loginDefer.callback(
                     self,
                 )
 
-        def onFailure(reason):
+        def onFailure(failure):
             """Handle failure to connect (e.g. due to timeout)"""
-            log.info('Login Call Failure: %s', reason.getTraceback())
+            self.log.failure('Login Call Failure', failure = failure)
             self.transport.loseConnection()
             self.factory.loginDefer.errback(
                 reason
@@ -1116,7 +1116,8 @@ class AMIFactory(protocol.ReconnectingClientFactory):
     """
     protocol = AMIProtocol
 
-    def __init__(self, username, secret, id=None, plaintext_login=True, on_reconnect=None):
+    def __init__(self, reactor, username, secret, id=None, plaintext_login=True, on_reconnect=None):
+        self.reactor = reactor
         self.username = username
         self.secret = secret
         self.id = id
@@ -1133,8 +1134,12 @@ class AMIFactory(protocol.ReconnectingClientFactory):
         large numbers of protocols simultaneously
         """
         self.loginDefer = defer.Deferred()
-        reactor.connectTCP(ip, port, self, timeout=timeout,
-                           bindAddress=bindAddress)
+        #reactor.connectTCP(ip, port, self, timeout=timeout,
+        #                   bindAddress=bindAddress)
+        ami_endpoint = endpoints.clientFromString(self.reactor,
+                                                       'tcp:host={}:port={}'.format(ip, port))
+        ami_endpoint.connect(self)
+
         return self.loginDefer
 
     def clientConnectionFailed(self, connector, reason):

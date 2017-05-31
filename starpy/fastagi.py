@@ -37,7 +37,6 @@ log = logging.getLogger('FastAGI')
 
 FAILURE_CODE = -1
 
-
 class FastAGIProtocol(basic.LineOnlyReceiver):
     """Protocol for the interfacing with the Asterisk FastAGI application
 
