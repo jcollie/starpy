@@ -27,6 +27,7 @@ from twisted.protocols import basic
 from twisted.internet import error as tw_error
 from twisted.logger import Logger
 import socket
+import logging
 from hashlib import md5
 from starpy import error
 
@@ -217,8 +218,8 @@ class AMIProtocol(basic.LineOnlyReceiver):
                 callable(tw_error.ConnectionDone(
                          "FastAGI connection terminated"))
             except Exception as err:
-                log.error("Failure during connectionLost for callable %s: %s",
-                          callable, err)
+                self.log.error("Failure during connectionLost for callable {callable:}: {err:}",
+                          callable = callable, err = err)
         self.actionIDCallbacks.clear()
         self.eventTypeCallbacks.clear()
     VERSION_PREFIX = 'Asterisk Call Manager'
