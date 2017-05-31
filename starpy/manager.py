@@ -22,7 +22,9 @@ for basic control of the channels active on a given Asterisk server.
 """
 
 import sys
-from twisted.internet import protocol, reactor, defer
+from twisted.internet import protocol
+from twisted.internet import reactor
+from twisted.internet import defer
 from twisted.protocols import basic
 from twisted.internet import error as tw_error
 from twisted.internet import endpoints
@@ -38,11 +40,13 @@ class deferredErrorResp(defer.Deferred):
     """A subclass of defer.Deferred that adds a registerError method
     to handle function callback when an Error response happens"""
     _errorRespCallback = None
+    log = Logger()
+
     def registerError(self, function ):
         """Add function for Error response callback"""
         self._errorRespCallback = function
-        log.debug('Registering function %s to handle Error response'
-                  % (function))
+        self.log.debug('Registering function {function:} to handle Error response',
+                       function = function)
 
 class AMIProtocol(basic.LineOnlyReceiver):
     """Protocol for the interfacing with the Asterisk Manager Interface (AMI)
@@ -198,7 +202,7 @@ class AMIProtocol(basic.LineOnlyReceiver):
             else:
                 # XXX messy here, would rather have the factory trigger its own
                 # callback...
-                self.log.info('Login Complete: {message:}', message)
+                self.log.info('Login Complete: {message:}', message = message)
                 self.factory.loginDefer.callback(
                     self,
                 )
