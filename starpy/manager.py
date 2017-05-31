@@ -1128,11 +1128,11 @@ class AMIFactory(ReconnectingClientFactory):
         large numbers of protocols simultaneously
         """
         #self.loginDefer = defer.Deferred()
-        #self.reactor.connectTCP(ip, port, self, timeout = timeout,
-        #                        bindAddress = bindAddress)
-        ami_endpoint = endpoints.clientFromString(self.reactor,
-                                                       'tcp:host={}:port={}'.format(ip, port))
-        ami_endpoint.connect(self)
+        self.reactor.connectTCP(ip, port, self, timeout = timeout,
+                                bindAddress = bindAddress)
+        #ami_endpoint = endpoints.clientFromString(self.reactor,
+        #                                               'tcp:host={}:port={}'.format(ip, port))
+        #ami_endpoint.connect(self)
 
         #return self.loginDefer
 
