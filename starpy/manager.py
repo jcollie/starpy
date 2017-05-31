@@ -232,7 +232,7 @@ class AMIProtocol(basic.LineOnlyReceiver):
 
     def dispatchIncoming(self):
         """Dispatch any finished incoming events/messages"""
-        log.debug('Dispatch Incoming')
+        self.log.debug('Dispatch Incoming')
         message = {}
         while self.messageCache:
             line = self.messageCache.pop(0)
@@ -262,7 +262,7 @@ class AMIProtocol(basic.LineOnlyReceiver):
                                      "ignored: %r", line)
                         else:
                             message[key.lower().strip()] = value.strip()
-        log.debug('Incoming Message: %s', message)
+        self.log.debug('Incoming Message: {message:}', message = message)
         if 'actionid' in message:
             key = message['actionid']
             callback = self.actionIDCallbacks.get(key)
@@ -289,9 +289,9 @@ class AMIProtocol(basic.LineOnlyReceiver):
                         handler(self, event)
                     except Exception as err:
                         # would like the getException code here...
-                        log.error(
-                            'Exception in event handler %s on event %s: %s',
-                            handler, event, err
+                        self.log.error(
+                            'Exception in event handler {handler:} on event {event:}: {err:}',
+                            handler = handler, event = event, err = err
                         )
 
     def generateActionId(self):
