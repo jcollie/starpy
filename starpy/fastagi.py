@@ -25,9 +25,13 @@ the server is listening.
 
 Module defines a standard Python logging module log 'FastAGI'
 """
-from twisted.internet import protocol, reactor, defer
+from twisted.internet import protocol
+from twisted.internet import reactor
+from twisted.internet import defer
 from twisted.internet import error as tw_error
 from twisted.protocols import basic
+from twisted.logger import Logger
+
 import socket
 import logging
 import time
@@ -82,6 +86,7 @@ class FastAGIProtocol(basic.LineOnlyReceiver):
     readingVariables = False
     lostConnectionDeferred = None
     delimiter = '\n'
+    log = Logger()
 
     def __init__(self, *args, **named):
         """Initialise the AMIProtocol, arguments are ignored"""
@@ -94,12 +99,12 @@ class FastAGIProtocol(basic.LineOnlyReceiver):
 
         Initiates read of the initial attributes passed by the server
         """
-        log.info("New Connection")
+        self.log.info("New Connection")
         self.readingVariables = True
 
     def connectionLost(self, reason):
         """(Internal) Handle loss of the connection (remote hangup)"""
-        log.info("""Connection terminated""")
+        self.log.info("Connection terminated")
         try:
             for df in self.pendingMessages:
                 df.errback(tw_error.ConnectionDone(
@@ -117,7 +122,7 @@ class FastAGIProtocol(basic.LineOnlyReceiver):
 
     def lineReceived(self, line):
         """(Internal) Handle Twisted's report of an incoming line from AMI"""
-        log.debug('Line In: %r', line)
+        self.log.debug('Line In: {line:}', line = repr(line))
         if self.readingVariables:
             if not line.strip():
                 self.readingVariables = False
@@ -127,15 +132,15 @@ class FastAGIProtocol(basic.LineOnlyReceiver):
                     key, value = line.split(':', 1)
                     value = value[1:].rstrip('\n').rstrip('\r')
                 except ValueError as err:
-                    log.error("""Invalid variable line: %r""", line)
+                    self.log.error("Invalid variable line: {line:}", line = repr(line))
                 else:
                     self.variables[key.lower()] = value
-                    log.debug("""%s = %r""", key, value)
+                    self.log.debug('{key:} = {value:}', key = key, value = value)
         else:
             try:
                 df = self.pendingMessages.pop(0)
             except IndexError as err:
-                log.warn("Line received without pending deferred: %r", line)
+                self.log.warn('Line received without pending deferred: {line:}', line = repr(line))
             else:
                 if line.startswith('200'):
                     line = line[4:]
@@ -153,7 +158,7 @@ class FastAGIProtocol(basic.LineOnlyReceiver):
 
     def sendCommand(self, commandString):
         """(Internal) Send the given command to the other side"""
-        log.info("Send Command: %r", commandString)
+        self.log.info('Send Command: {command:}', command = commandString)
         commandString = commandString.rstrip('\n').rstrip('\r')
         df = defer.Deferred()
         self.pendingMessages.append(df)
@@ -331,8 +336,8 @@ class FastAGIProtocol(basic.LineOnlyReceiver):
             if endposStuff.startswith('endpos='):
                 endpos = int(endposStuff[7:])
             else:
-                log.error("Unexpected response to 'control stream file': %s",
-                          resultLine)
+                self.log.error("Unexpected response to 'control stream file': {result:}",
+                               result = resultLine)
         return result, endpos
 
     def controlStreamFile(
@@ -964,10 +969,10 @@ class InSequence(object):
 
     def onActionSuccess(self, result, finalDF):
         """Handle individual-action success"""
-        log.debug('onActionSuccess: %s', result)
+        self.log.debug('onActionSuccess: {result:}', result = result)
         if self.actions:
             action = self.actions.pop(0)
-            log.debug('action %s', action)
+            self.log.debug('action {action:}', action = action)
             df = defer.maybeDeferred(action[0], *action[1], **action[2])
             df.addCallback(self.recordResult)
             df.addCallback(self.onActionSuccess, finalDF=finalDF)
@@ -978,7 +983,7 @@ class InSequence(object):
 
     def onActionFailure(self, reason, finalDF):
         """Handle individual-action failure"""
-        log.debug('onActionFailure')
+        self.log.debug('onActionFailure')
         reason.results = self.results
         finalDF.errback(reason)
 
