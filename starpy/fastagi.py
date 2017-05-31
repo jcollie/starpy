@@ -33,11 +33,11 @@ from twisted.protocols import basic
 from twisted.logger import Logger
 
 import socket
-import logging
+#import logging
 import time
 from starpy import error
 
-log = logging.getLogger('FastAGI')
+#log = logging.getLogger('FastAGI')
 
 FAILURE_CODE = -1
 
@@ -85,7 +85,7 @@ class FastAGIProtocol(basic.LineOnlyReceiver):
     """
     readingVariables = False
     lostConnectionDeferred = None
-    delimiter = '\n'
+    delimiter = b'\n'
     log = Logger()
 
     def __init__(self, *args, **named):
@@ -99,16 +99,16 @@ class FastAGIProtocol(basic.LineOnlyReceiver):
 
         Initiates read of the initial attributes passed by the server
         """
-        self.log.info("New Connection")
+        self.log.info('New Connection')
         self.readingVariables = True
 
     def connectionLost(self, reason):
         """(Internal) Handle loss of the connection (remote hangup)"""
-        self.log.info("Connection terminated")
+        self.log.info('Connection lost')
         try:
             for df in self.pendingMessages:
                 df.errback(tw_error.ConnectionDone(
-                        "FastAGI connection terminated"))
+                        "FastAGI connection lost"))
         finally:
             if self.lostConnectionDeferred:
                 self.lostConnectionDeferred.errback(reason)
@@ -992,6 +992,7 @@ class FastAGIFactory(protocol.Factory):
     """Factory generating FastAGI server instances
     """
     protocol = FastAGIProtocol
+    log = Logger()
 
     def __init__(self, mainFunction):
         """Initialise the factory
