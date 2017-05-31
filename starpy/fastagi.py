@@ -33,11 +33,8 @@ from twisted.protocols import basic
 from twisted.logger import Logger
 
 import socket
-#import logging
 import time
 from starpy import error
-
-#log = logging.getLogger('FastAGI')
 
 FAILURE_CODE = -1
 

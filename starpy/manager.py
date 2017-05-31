@@ -184,8 +184,7 @@ class AMIProtocol(LineOnlyReceiver):
 
         XXX Should probably use proper Twisted-style credential negotiations
         """
-        self.log.info('Connection Made')
-        self.factory.resetDelay()
+        self.log.info('connection made')
         if self.factory.plaintext_login:
             df = self.login()
         else:
@@ -224,15 +223,16 @@ class AMIProtocol(LineOnlyReceiver):
                 callable(ConnectionDone("FastAGI connection terminated"))
             except Exception as err:
                 self.log.error("Failure during connectionLost for callable {callable:}: {err:}",
-                          callable = callable, err = err)
+                               callable = callable, err = err)
         self.actionIDCallbacks.clear()
         self.eventTypeCallbacks.clear()
+
     VERSION_PREFIX = 'Asterisk Call Manager'
     END_DATA = '--END COMMAND--'
 
     def dispatchIncoming(self):
         """Dispatch any finished incoming events/messages"""
-        self.log.debug('Dispatch Incoming')
+        self.log.debug('dispatch incoming')
         message = {}
         while self.messageCache:
             line = self.messageCache.pop(0)
@@ -262,7 +262,7 @@ class AMIProtocol(LineOnlyReceiver):
                                           "ignored: {line:}", line = repr(line))
                         else:
                             message[key.lower().strip()] = value.strip()
-        self.log.debug('Incoming Message: {message:}', message = message)
+        self.log.debug('Incoming message: {message:}', message = repr(message))
         if 'actionid' in message:
             key = message['actionid']
             callback = self.actionIDCallbacks.get(key)
@@ -608,7 +608,6 @@ class AMIProtocol(LineOnlyReceiver):
 
         Uses factory.username and factory.secret
         """
-        self.id = self.factory.id
         return self.sendDeferred({
             'action': 'login',
             'username': self.factory.username,
@@ -632,7 +631,6 @@ class AMIProtocol(LineOnlyReceiver):
                 'username': self.factory.username,
                 'key': key_value,
             }).addCallback(self.errorUnlessResponse)
-        self.id = self.factory.id
         return self.sendDeferred({
             'action': 'Challenge',
             'authtype': 'MD5',
@@ -1122,12 +1120,12 @@ class AMIFactory(ReconnectingClientFactory):
     """
     log = Logger()
 
-    def __init__(self, reactor, username, secret, id=None, plaintext_login=True):
+    def __init__(self, reactor, username, secret, plaintext_login = True, on_connected = None):
         self.reactor = reactor
         self.username = username
         self.secret = secret
-        self.id = id
         self.plaintext_login = plaintext_login
+        self.on_connected = on_connected
 
     def login(self, ip = 'localhost', port = 5038, timeout = 5, bindAddress = None):
         """Connect and return protocol instance
@@ -1139,11 +1137,11 @@ class AMIFactory(ReconnectingClientFactory):
         large numbers of protocols simultaneously
         """
         #self.loginDefer = defer.Deferred()
-        self.reactor.connectTCP(ip, port, self, timeout = timeout,
-                                bindAddress = bindAddress)
-        #ami_endpoint = endpoints.clientFromString(self.reactor,
-        #                                               'tcp:host={}:port={}'.format(ip, port))
-        #ami_endpoint.connect(self)
+        #self.reactor.connectTCP(ip, port, self, timeout = timeout,
+        #                        bindAddress = bindAddress)
+        ami_endpoint = endpoints.clientFromString(self.reactor,
+                                                       'tcp:host={}:port={}'.format(ip, port))
+        ami_endpoint.connect(self)
 
         #return self.loginDefer
 
@@ -1156,21 +1154,9 @@ class AMIFactory(ReconnectingClientFactory):
         return AMIProtocol(self)
 
     def clientConnectionFailed(self, connector, reason):
-        """Connection failed, report to our callers"""
         self.log.info('connection failed, reconnecting...')
-        #self.loginDefer.errback(reason)
-        #self.reconnect(connector)
         ReconnectingClientFactory.clientConnectionLost(self, connector, reason)
 
     def clientConnectionLost(self, connector, reason):
-        """Connection lost, re-build the login connection"""
         self.log.info('connection lost, reconnecting...')
-        #self.log.debug(self.on_reconnect)
-        #self.reconnect(connector)
         ReconnectingClientFactory.clientConnectionFailed(self, connector, reason)
-
-    def reconnect(self, connector):
-        self.retry(connector)
-        #self.loginDefer = Deferred()
-        #if self.on_reconnect:
-        #    self.on_reconnect(self.loginDefer)
