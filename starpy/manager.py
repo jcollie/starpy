@@ -26,10 +26,12 @@ import socket
 
 from hashlib import md5
 
+from twisted.application.internet import ClientService
 from twisted.internet.defer import Deferred
 from twisted.internet import endpoints
 from twisted.internet.error import ConnectionDone
-from twisted.internet.protocol import ReconnectingClientFactory
+#from twisted.internet.protocol import ReconnectingClientFactory
+from twisted.internet.protocol import Factory
 from twisted.logger import Logger
 from twisted.protocols.basic import LineOnlyReceiver
 from twisted.python.failure import Failure
@@ -209,7 +211,7 @@ class AMIProtocol(LineOnlyReceiver):
 
     def connectionLost(self, reason):
         """Connection lost, clean up callbacks"""
-        self.log.info('Connection lost')
+        self.log.info('connection lost')
         for key, callable in self.actionIDCallbacks.items():
             try:
                 callable(ConnectionDone("FastAGI connection terminated"))
@@ -224,7 +226,6 @@ class AMIProtocol(LineOnlyReceiver):
 
     def dispatchIncoming(self):
         """Dispatch any finished incoming events/messages"""
-        self.log.debug('dispatch incoming')
         message = {}
         while self.messageCache:
             line = self.messageCache.pop(0)
@@ -1105,7 +1106,7 @@ class AMIProtocol(LineOnlyReceiver):
         return self.sendDeferred(message).addCallback(self.errorUnlessResponse)
 
 
-class AMIFactory(ReconnectingClientFactory):
+class AMIFactory(Factory):
     """A factory for AMI protocols
     """
     log = Logger()
@@ -1127,11 +1128,12 @@ class AMIFactory(ReconnectingClientFactory):
         large numbers of protocols simultaneously
         """
         #self.loginDefer = defer.Deferred()
-        self.reactor.connectTCP(ip, port, self, timeout = timeout,
-                                bindAddress = bindAddress)
-        #ami_endpoint = endpoints.clientFromString(self.reactor,
-        #                                               'tcp:host={}:port={}'.format(ip, port))
-        #ami_endpoint.connect(self)
+        #self.reactor.connectTCP(ip, port, self, timeout = timeout,
+        #                        bindAddress = bindAddress)
+        self.endpoint = endpoints.clientFromString(self.reactor,
+                                                   'tcp:host={}:port={}'.format(ip, port))
+        self.service = ClientService(self.endpoint, self)
+        self.service.startService()
 
         #return self.loginDefer
 
@@ -1143,10 +1145,10 @@ class AMIFactory(ReconnectingClientFactory):
         self.resetDelay()
         return AMIProtocol(self)
 
-    def clientConnectionFailed(self, connector, reason):
-        self.log.info('connection failed, reconnecting...')
-        ReconnectingClientFactory.clientConnectionLost(self, connector, reason)
+    #def clientConnectionFailed(self, connector, reason):
+    #    self.log.info('connection failed, reconnecting...')
+    #    ReconnectingClientFactory.clientConnectionLost(self, connector, reason)
 
-    def clientConnectionLost(self, connector, reason):
-        self.log.info('connection lost, reconnecting...')
-        ReconnectingClientFactory.clientConnectionFailed(self, connector, reason)
+    #def clientConnectionLost(self, connector, reason):
+    #    self.log.info('connection lost, reconnecting...')
+    #    ReconnectingClientFactory.clientConnectionFailed(self, connector, reason)
