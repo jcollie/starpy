@@ -72,7 +72,7 @@ class AMIProtocol(LineOnlyReceiver):
     amiVersion = None
     id = None
 
-    def __init__(self, factory)
+    def __init__(self, factory):
         self.factory = factory
         self.messageCache = []
         self.actionIDCallbacks = {}
