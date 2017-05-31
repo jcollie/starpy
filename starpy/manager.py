@@ -171,8 +171,8 @@ class AMIProtocol(LineOnlyReceiver):
 
     def lineReceived(self, line):
         """Handle Twisted's report of an incoming line from the manager"""
-        self.log.debug('Line In: {line:}', line = line)
-        self.messageCache.append(line)
+        self.log.debug('Line in: {line:}', line = repr(line))
+        self.messageCache.append(line.decode('utf-8'))
         if not line.strip():
             self.dispatchIncoming()  # does dispatch and clears cache
 
@@ -193,27 +193,19 @@ class AMIProtocol(LineOnlyReceiver):
         def onComplete(message):
             """Check for success, errback or callback as appropriate"""
             if not message['response'] == 'Success':
-                self.log.info('Login Failure: {message:}', message = message)
+                self.log.info('Login failure: {message:}', message = message)
                 self.transport.loseConnection()
-                #self.factory.loginDefer.errback(
-                #    error.AMICommandFailure("Unable to connect to manager",
-                #                            message)
-                #)
+
             else:
-                # XXX messy here, would rather have the factory trigger its own
-                # callback...
-                self.log.info('Login Complete: {message:}', message = message)
-                #self.factory.loginDefer.callback(
-                #    self,
-                #)
+                self.log.info('Login complete: {message:}', message = message)
+                if self.factory.on_connected is not None:
+                    self.factory.on_connected(self)
 
         def onFailure(failure):
             """Handle failure to connect (e.g. due to timeout)"""
-            self.log.failure('Login Call Failure', failure = failure)
+            self.log.failure('Login call failure', failure = failure)
             self.transport.loseConnection()
-            #self.factory.loginDefer.errback(
-            #    failure
-            #)
+
         df.addCallbacks(onComplete, onFailure)
 
     def connectionLost(self, reason):
@@ -237,8 +229,6 @@ class AMIProtocol(LineOnlyReceiver):
         while self.messageCache:
             line = self.messageCache.pop(0)
 
-            if type(line) is bytes:
-                line = line.decode('utf-8')
             line = line.strip()
             if line:
                 if line.endswith(self.END_DATA):

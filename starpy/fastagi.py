@@ -85,8 +85,8 @@ class FastAGIProtocol(basic.LineOnlyReceiver):
     delimiter = b'\n'
     log = Logger()
 
-    def __init__(self, *args, **named):
-        """Initialise the AMIProtocol, arguments are ignored"""
+    def __init__(self, *args, **kwargs):
+        """Initialise the AGIProtocol, arguments are ignored"""
         self.messageCache = []
         self.variables = {}
         self.pendingMessages = []
