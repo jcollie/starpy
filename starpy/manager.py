@@ -25,9 +25,9 @@ import sys
 from twisted.internet import defer
 from twisted.internet import endpoints
 from twisted.internet import error as tw_error
-from twisted.internet import protocol
+from twisted.internet.protocol import ReconnectingClientFactory
 from twisted.logger import Logger
-from twisted.protocols import basic
+from twisted.protocols.basic import LineOnlyReceiver
 from twisted.python.failure import Failure
 import socket
 #import logging
@@ -48,7 +48,7 @@ class deferredErrorResp(defer.Deferred):
         self.log.debug('Registering function {function:} to handle Error response',
                        function = function)
 
-class AMIProtocol(basic.LineOnlyReceiver):
+class AMIProtocol(LineOnlyReceiver):
     """Protocol for the interfacing with the Asterisk Manager Interface (AMI)
 
     Provides most of the AMI Action interfaces.
@@ -1118,7 +1118,7 @@ class AMIProtocol(basic.LineOnlyReceiver):
         return self.sendDeferred(message).addCallback(self.errorUnlessResponse)
 
 
-class AMIFactory(protocol.ReconnectingClientFactory):
+class AMIFactory(ReconnectingClientFactory):
     """A factory for AMI protocols
     """
     log = Logger()
