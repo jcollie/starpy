@@ -218,7 +218,6 @@ class AMIProtocol(LineOnlyReceiver):
                                callable = callable, err = err)
         self.actionIDCallbacks.clear()
         self.eventTypeCallbacks.clear()
-        self.factory.clientConnectionLost(None, reason)
 
     VERSION_PREFIX = 'Asterisk Call Manager'
     END_DATA = '--END COMMAND--'
