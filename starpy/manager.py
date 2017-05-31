@@ -196,25 +196,25 @@ class AMIProtocol(LineOnlyReceiver):
             if not message['response'] == 'Success':
                 self.log.info('Login Failure: {message:}', message = message)
                 self.transport.loseConnection()
-                self.factory.loginDefer.errback(
-                    error.AMICommandFailure("Unable to connect to manager",
-                                            message)
-                )
+                #self.factory.loginDefer.errback(
+                #    error.AMICommandFailure("Unable to connect to manager",
+                #                            message)
+                #)
             else:
                 # XXX messy here, would rather have the factory trigger its own
                 # callback...
                 self.log.info('Login Complete: {message:}', message = message)
-                self.factory.loginDefer.callback(
-                    self,
-                )
+                #self.factory.loginDefer.callback(
+                #    self,
+                #)
 
         def onFailure(failure):
             """Handle failure to connect (e.g. due to timeout)"""
             self.log.failure('Login Call Failure', failure = failure)
             self.transport.loseConnection()
-            self.factory.loginDefer.errback(
-                reason
-            )
+            #self.factory.loginDefer.errback(
+            #    failure
+            #)
         df.addCallbacks(onComplete, onFailure)
 
     def connectionLost(self, reason):
@@ -1123,15 +1123,14 @@ class AMIFactory(ReconnectingClientFactory):
     """
     log = Logger()
 
-    def __init__(self, reactor, username, secret, id=None, plaintext_login=True, on_reconnect=None):
+    def __init__(self, reactor, username, secret, id=None, plaintext_login=True):
         self.reactor = reactor
         self.username = username
         self.secret = secret
         self.id = id
         self.plaintext_login = plaintext_login
-        self.on_reconnect = on_reconnect
 
-    def login(self, ip='localhost', port=5038, timeout=5, bindAddress=None):
+    def login(self, ip = 'localhost', port = 5038, timeout = 5, bindAddress = None):
         """Connect and return protocol instance
 
         Connect and return our (singleton) protocol instance with login
@@ -1140,14 +1139,14 @@ class AMIFactory(ReconnectingClientFactory):
         XXX This is messy, we'd much rather have the factory able to create
         large numbers of protocols simultaneously
         """
-        self.loginDefer = defer.Deferred()
+        #self.loginDefer = defer.Deferred()
         self.reactor.connectTCP(ip, port, self, timeout = timeout,
                                 bindAddress = bindAddress)
         #ami_endpoint = endpoints.clientFromString(self.reactor,
         #                                               'tcp:host={}:port={}'.format(ip, port))
         #ami_endpoint.connect(self)
 
-        return self.loginDefer
+        #return self.loginDefer
 
     def startedConnecting(self, connector):
         self.log.debug('started to connect')
@@ -1160,7 +1159,7 @@ class AMIFactory(ReconnectingClientFactory):
     def clientConnectionFailed(self, connector, reason):
         """Connection failed, report to our callers"""
         self.log.info('connection failed, reconnecting...')
-        self.loginDefer.errback(reason)
+        #self.loginDefer.errback(reason)
         #self.reconnect(connector)
         ReconnectingClientFactory.clientConnectionLost(self, connector, reason)
 
@@ -1173,6 +1172,6 @@ class AMIFactory(ReconnectingClientFactory):
 
     def reconnect(self, connector):
         self.retry(connector)
-        self.loginDefer = defer.Deferred()
-        if self.on_reconnect:
-            self.on_reconnect(self.loginDefer)
+        #self.loginDefer = defer.Deferred()
+        #if self.on_reconnect:
+        #    self.on_reconnect(self.loginDefer)
