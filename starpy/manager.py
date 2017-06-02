@@ -1136,3 +1136,6 @@ class AMIService(object):
         self.service = ClientService(self.endpoint, self.factory)
         self.service.setName('Asterisk Manager Interface')
         self.service.startService()
+
+    def whenConnected(self):
+        return self.service.whenConnected()
