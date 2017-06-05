@@ -158,23 +158,19 @@ class FastAGIProtocol(LineOnlyReceiver):
             except IndexError as err:
                 self.log.warn('Line received without pending deferred: {line:}', line = repr(line))
             else:
-                if line.startswith('200'):
-                    line = line[4:]
-                    if line.lower().startswith('result='):
-                        line = line[7:]
-                    df.callback(line)
+                match = self.line_re.match(line)
+                code = match.group(1)
+                continuation = match.group(2)
+                result = int(match.group(3))
+                data = match.group(4)
+                if code == '200':
+                    df.callback((code, continuation, result, data))
                 else:
-                    # XXX parse out the error code
-                    try:
-                        errCode, line = line.split(' ', 1)
-                        errCode = int(errCode)
-                    except ValueError as err:
-                        errCode = 500
-                    df.errback(AGICommandFailure(errCode, line))
+                    df.errback(AGICommandFailure(code, continuation, result, data))
 
     def sendCommand(self, commandString):
         """(Internal) Send the given command to the other side"""
-        commandString = commandString.rstrip('\n').rstrip('\r').encode('utf-8')
+        commandString = commandString.encode('utf-8')
         if self.log_commands_sent:
             self.log.info('Sending command: {commandString:}', commandString = commandString)
         df = Deferred()
@@ -182,16 +178,14 @@ class FastAGIProtocol(LineOnlyReceiver):
         self.sendLine(commandString)
         return df
 
-    def checkFailure(self, result, failure = '-1'):
+    def checkFailure(self, result, failure = -1):
         """(Internal) Check for a failure-code, raise error if == result"""
-        # result code may have trailing information...
-        try:
-            resultInt, line = result.split(' ', 1)
-        except ValueError as err:
-            resultInt = result
-        if resultInt.strip() == failure:
+
+        code, continuation, result, data = result
+        if result == failure:
             raise AGICommandFailure(FAILURE_CODE, result)
-        return result
+
+        return data
 
     def resultAsInt(self, result):
         """(Internal) Convert result to an integer value"""
