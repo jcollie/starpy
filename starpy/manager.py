@@ -629,16 +629,18 @@ class AMIProtocol(LineOnlyReceiver):
                 raise AMICommandFailure(challenge)
 
             key_value = md5('{}{}'.format(challenge['challenge'], self.factory.service.secret)).hexdigest()
-            return self.sendDeferred({
-                'action': 'Login',
-                'authtype': 'MD5',
-                'username': self.factory.service.username,
-                'key': key_value,
-            }).addCallback(self.errorUnlessResponse)
-        return self.sendDeferred({
-            'action': 'Challenge',
-            'authtype': 'MD5',
-        }).addCallback(sendResponse)
+
+            d = self.sendDeferred({'action': 'Login',
+                                   'authtype': 'MD5',
+                                   'username': self.factory.service.username,
+                                   'key': key_value})
+            d = d.addCallback(self.errorUnlessResponse)
+            return d
+
+        d = self.sendDeferred({'action': 'Challenge',
+                               'authtype': 'MD5'})
+        d = d.addCallback(sendResponse)
+        return d
 
     def listCommands(self):
         """List the set of commands available
@@ -656,20 +658,20 @@ class AMIProtocol(LineOnlyReceiver):
                 pass
             return message
 
-        return self.sendDeferred(message).addCallback(
-            self.errorUnlessResponse
-        ).addCallback(
-            removeActionId
-        )
+        d = self.sendDeferred(message)
+        d = d.addCallback(self.errorUnlessResponse)
+        d = d.addCallback(removeActionId)
+        return d
 
     def logoff(self):
         """Log off from the manager instance"""
         message = {
             'action': 'logoff'
         }
-        return self.sendDeferred(message).addCallback(
-            self.errorUnlessResponse, expected='Goodbye',
-        )
+
+        d = self.sendDeferred(message)
+        d = d.addCallback(self.errorUnlessResponse, expected='Goodbye')
+        return d
 
     def mailboxCount(self, mailbox):
         """Get count of messages in the given mailbox"""
@@ -677,7 +679,9 @@ class AMIProtocol(LineOnlyReceiver):
             'action': 'mailboxcount',
             'mailbox': mailbox
         }
-        return self.sendDeferred(message).addCallback(self.errorUnlessResponse)
+        d = self.sendDeferred(message)
+        d = d.addCallback(self.errorUnlessResponse)
+        return d
 
     def mailboxStatus(self, mailbox):
         """Get status of given mailbox"""
@@ -685,7 +689,10 @@ class AMIProtocol(LineOnlyReceiver):
             'action': 'mailboxstatus',
             'mailbox': mailbox
         }
-        return self.sendDeferred(message).addCallback(self.errorUnlessResponse)
+
+        d = self.sendDeferred(message)
+        d = d.addCallback(self.errorUnlessResponse)
+        return d
 
     def meetmeMute(self, meetme, usernum):
         """Mute a user in a given meetme"""
@@ -800,14 +807,15 @@ class AMIProtocol(LineOnlyReceiver):
         message = {
             'action': 'ping'
         }
+
+        d = self.sendDeferred(message)
         if self.amiVersion == "1.0":
-            return self.sendDeferred(message).addCallback(
-                self.errorUnlessResponse, expected='Pong',
-            )
+            d = d.addCallback(self.errorUnlessResponse, expected='Pong')
+
         else:
-            return self.sendDeferred(message).addCallback(
-                self.errorUnlessResponse
-            )
+            d = d.addCallback(self.errorUnlessResponse)
+
+        return d
 
     def playDTMF(self, channel, digit):
         """Play DTMF on a given channel"""
