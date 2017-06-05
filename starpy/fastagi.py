@@ -34,6 +34,7 @@ from twisted.internet.error import ConnectionDone
 from twisted.protocols.basic import LineOnlyReceiver
 from twisted.logger import Logger
 
+import re
 import time
 
 from .error import AGICommandFailure
