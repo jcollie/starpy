@@ -87,15 +87,11 @@ class AMIProtocol(LineOnlyReceiver):
         self.log_messages_sent = log_messages_sent
         self.log_messages_received = log_messages_received
 
-        self.log.debug('AAAA')
-
         self.amiVersion = None
         self.messageCache = []
         self.actionIDCallbacks = {}
         self.eventTypeCallbacks = {}
         self.ami_id = str(uuid.uuid4())
-
-        self.log.debug('BBBB')
 
     def registerEvent(self, event, function):
         """Register callback for the given event-type
@@ -221,7 +217,8 @@ class AMIProtocol(LineOnlyReceiver):
                     self.factory.service.on_connected(self)
 
         def onFailure(failure):
-            """Handle failure to connect (e.g. due to timeout)"""
+            """Handle failure to login (e.g. due to timeout)"""
+
             self.log.failure('Login call failure', failure = failure)
             self.transport.loseConnection()
 
@@ -1136,13 +1133,11 @@ class AMIFactory(Factory):
 
     def buildProtocol(self, addr):
         self.log.debug('Building AMI protocol for {addr:}', addr = addr)
-        p = AMIProtocol(self,
-                        log_lines_sent = self.log_lines_sent,
-                        log_lines_received = self.log_lines_received,
-                        log_messages_sent = self.log_messages_sent,
-                        log_messages_received = self.log_messages_received)
-        self.log.debug('XXXX')
-        return p
+        return AMIProtocol(self,
+                           log_lines_sent = self.log_lines_sent,
+                           log_lines_received = self.log_lines_received,
+                           log_messages_sent = self.log_messages_sent,
+                           log_messages_received = self.log_messages_received)
 
 class AMIService(object):
     def __init__(self, reactor, username, secret,
