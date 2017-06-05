@@ -1122,23 +1122,24 @@ class AMIFactory(Factory):
     """
     log = Logger()
 
-    def __init__(self, service, log_lines_received = False, log_messages_sent = False,
-                 log_messages_received = False):
+    def __init__(self, service, log_lines_sent = False, log_lines_received = False,
+                 log_messages_sent = False, log_messages_received = False):
         self.service = service
+        self.log_lines_sent = log_lines_sent
         self.log_lines_received = log_lines_received
         self.log_messages_sent = log_messages_sent
         self.log_messages_received = log_messages_received
 
     def buildProtocol(self, addr):
         self.log.debug('Building AMI protocol for {addr:}', addr = addr)
-        return AMIProtocol(self, self.log_lines_received, self.log_messages_sent, self.log_messages_recived)
+        return AMIProtocol(self, self.log_lines_sent, self.log_lines_received, self.log_messages_sent, self.log_messages_recived)
 
 class AMIService(object):
     def __init__(self, reactor, username, secret,
                  hostname = 'localhost', port = 5038, tls = False,
                  plaintext_login = True, on_connected = None,
-                 log_lines_received = False, log_messages_sent = False,
-                 log_messages_received = False):
+                 log_lines_sent = False, log_lines_received = False,
+                 log_messages_sent = False, log_messages_received = False):
 
         self.reactor = reactor
         self.username = username
@@ -1148,11 +1149,12 @@ class AMIService(object):
         self.tls = tls
         self.plaintext_login = plaintext_login
         self.on_connected = on_connected
+        self.log_lines_sent = self.log_lines_sent
         self.log_lines_received = log_lines_received
         self.log_messages_sent = log_messages_sent
         self.log_messages_received = log_messages_received
 
-        self.factory = AMIFactory(self, self.log_lines_received, self.log_messages_sent, self.log_messages_received)
+        self.factory = AMIFactory(self, self.log_lines_sent, self.log_lines_received, self.log_messages_sent, self.log_messages_received)
         self.endpoint = clientFromString(self.reactor,
                                          'tcp:host={}:port={}'.format(self.hostname, self.port))
         self.service = ClientService(self.endpoint, self.factory)
