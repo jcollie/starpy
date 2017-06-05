@@ -256,19 +256,21 @@ class AMIProtocol(LineOnlyReceiver):
                 else:
                     # regular line...
                     if line.startswith(self.VERSION_PREFIX):
-                        self.amiVersion = line[
-                                    len(self.VERSION_PREFIX) + 1:].strip()
+                        self.amiVersion = line[len(self.VERSION_PREFIX) + 1:].strip()
+
                     else:
                         try:
                             key, value = line.split(':', 1)
                         except ValueError as err:
                             # XXX data-safety issues, what prevents the
                             # VERSION_PREFIX from showing up in a data-set?
-                            self.log.warn("Improperly formatted line received and "
-                                          "ignored: {line:}", line = repr(line))
+                            self.log.warn("Improperly formatted line received and ignored: {line:}", line = repr(line))
                         else:
                             message[key.lower().strip()] = value.strip()
-        #self.log.debug('Incoming message: {message:}', message = repr(message))
+
+        if self.log_messages_received:
+            self.log.debug('Message received: {message:}', message = repr(message))
+
         if 'actionid' in message:
             key = message['actionid']
             callback = self.actionIDCallbacks.get(key)
@@ -295,10 +297,8 @@ class AMIProtocol(LineOnlyReceiver):
                         handler(self, event)
                     except Exception as err:
                         # would like the getException code here...
-                        self.log.error(
-                            'Exception in event handler {handler:} on event {event:}: {err:}',
-                            handler = handler, event = event, err = err
-                        )
+                        self.log.error('Exception in event handler {handler:} on event {event:}: {err:}',
+                                       handler = handler, event = event, err = err)
 
     def generateActionId(self):
         """Generate a unique action ID
