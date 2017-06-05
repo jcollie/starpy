@@ -25,7 +25,7 @@ for basic control of the channels active on a given Asterisk server.
 """
 
 import sys
-import socket
+import uuid
 
 from hashlib import md5
 
@@ -38,19 +38,23 @@ from twisted.logger import Logger
 from twisted.protocols.basic import LineOnlyReceiver
 from twisted.python.failure import Failure
 
-from starpy.error import AMICommandFailure
+from .error import AMICommandFailure
 
 class deferredErrorResp(Deferred):
-    """A subclass of Deferred that adds a registerError method
-    to handle function callback when an Error response happens"""
-    _errorRespCallback = None
+    """A subclass of Deferred that adds a registerError method to handle
+    function callback when an Error response"""
+
     log = Logger()
+
+    def __init__(self):
+        self._errorRespCallback = None
+        Deferred.__init__(self)
 
     def registerError(self, function ):
         """Add function for Error response callback"""
+
         self._errorRespCallback = function
-        self.log.debug('Registering function {function:} to handle Error response',
-                       function = function)
+        self.log.debug('Registering function {function:} to handle Error response', function = function)
 
 class AMIProtocol(LineOnlyReceiver):
     """Protocol for the interfacing with the Asterisk Manager Interface (AMI)
@@ -69,17 +73,25 @@ class AMIProtocol(LineOnlyReceiver):
         messageCache -- stores incoming message fragments from the manager
         id -- An identifier for this instance
     """
+
     log = Logger()
 
     count = 0
 
-    def __init__(self, factory):
+    def __init__(self, factory,
+                 log_lines_sent = False, log_lines_received = False,
+                 log_messages_sent = False, log_messages_received = False):
         self.factory = factory
+        self.log_lines_sent = log_lines_sent
+        self.log_lines_received = log_lines_received
+        self.log_messages_sent = log_messages_sent
+        self.log_messages_received = log_messages_received
+
         self.amiVersion = None
         self.messageCache = []
         self.actionIDCallbacks = {}
         self.eventTypeCallbacks = {}
-        self.hostName = socket.gethostname()
+        self.ami_id = str(uuid.uuid4())
 
     def registerEvent(self, event, function):
         """Register callback for the given event-type
@@ -173,7 +185,8 @@ class AMIProtocol(LineOnlyReceiver):
 
     def lineReceived(self, line):
         """Handle Twisted's report of an incoming line from the manager"""
-        #self.log.debug('Line in: {line:}', line = repr(line))
+        if self.log_lines_received:
+            self.log.debug('Line in: {line:}', line = repr(line))
         self.messageCache.append(line.decode('utf-8'))
         if not line.strip():
             self.dispatchIncoming()  # does dispatch and clears cache
@@ -289,16 +302,11 @@ class AMIProtocol(LineOnlyReceiver):
     def generateActionId(self):
         """Generate a unique action ID
 
-        Assumes that hostName must be unique among all machines which talk
-        to a given AMI server.  With that is combined the memory location of
-        the protocol object (which should be machine-unique) and the count of
-        messages that this manager has created so far.
-
         Generally speaking, you shouldn't need to know the action ID, as the
         protocol handles the management of them automatically.
         """
         self.count += 1
-        return '{}-{}-{}'.format(self.hostName, id(self), self.count)
+        return '{}-{}'.format(self.ami_id, self.count)
 
     def sendDeferred(self, message):
         """Send with a single-callback deferred object
@@ -315,6 +323,7 @@ class AMIProtocol(LineOnlyReceiver):
 
     def checkErrorResponse(self, result, actionid, df):
         """Check for error response and callback"""
+
         self.cleanup( result, actionid)
         if isinstance(result, dict) and result.get('response') == 'Error' and df._errorRespCallback:
             df._errorRespCallback(result)
@@ -333,6 +342,7 @@ class AMIProtocol(LineOnlyReceiver):
 
         returns the actionid for the message
         """
+
         if type(message) == list:
             actionid = None
             for header, value in message:
@@ -343,9 +353,10 @@ class AMIProtocol(LineOnlyReceiver):
                 message.append(['actionid', str(actionid)])
             if responseCallback:
                 self.actionIDCallbacks[actionid] = responseCallback
-            self.log.debug('MSG OUT: {message:}', message = message)
+            if self.log_messages_sent:
+                self.log.debug('Message out: {message:}', message = message)
             for item in message:
-                line = ('%s: %s' % (str(item[0].lower()), str(item[1])))
+                line = '{}: {}'.format(str(item[0].lower()), str(item[1]))
                 self.sendLine(line.encode('utf-8'))
         else:
             message = dict([(k.lower(), v) for (k, v) in message.items()])
@@ -353,9 +364,10 @@ class AMIProtocol(LineOnlyReceiver):
                 message['actionid'] = self.generateActionId()
             if responseCallback:
                 self.actionIDCallbacks[message['actionid']] = responseCallback
-            self.log.debug('MSG OUT: {message:}', message = message)
+            if self.log_messages_sent:
+                self.log.debug('Message out: {message:}', message = message)
             for key, value in message.items():
-                line = ('{}: {}'.format(str(key.lower()), str(value)))
+                line = '{}: {}'.format(str(key.lower()), str(value))
                 self.sendLine(line.encode('utf-8'))
         self.sendLine(''.encode('utf-8'))
         if type(message) == list:
@@ -614,6 +626,7 @@ class AMIProtocol(LineOnlyReceiver):
         def sendResponse(challenge):
             if not type(challenge) is dict or not 'challenge' in challenge:
                 raise AMICommandFailure(challenge)
+
             key_value = md5('{}{}'.format(challenge['challenge'], self.factory.service.secret)).hexdigest()
             return self.sendDeferred({
                 'action': 'Login',
@@ -702,12 +715,10 @@ class AMIProtocol(LineOnlyReceiver):
         }
         return self.sendDeferred(message).addCallback(self.errorUnlessResponse)
 
-    def originate(
-            self, channel, context=None, exten=None, priority=None,
-            timeout=None, callerid=None, account=None, application=None,
-            data=None, variable={}, async=False, actionid=None, channelid=None,
-			otherchannelid=None
-        ):
+    def originate(self, channel, context = None, exten = None, priority = None,
+                  timeout = None, callerid = None, account = None, application = None,
+                  data = None, variable = {}, async = False, actionid = None, channelid = None,
+		  otherchannelid = None):
         """Originate call to connect channel to given context/exten/priority
 
         channel -- the outgoing channel to which will be dialed
@@ -722,25 +733,26 @@ class AMIProtocol(LineOnlyReceiver):
         variable -- variables associated to the call
         async -- make the origination asynchronous
         """
-        message = [(k, v) for (k, v) in (
-            ('action', 'originate'),
-            ('channel', channel),
-            ('context', context),
-            ('exten', exten),
-            ('priority', priority),
-            ('callerid', callerid),
-            ('account', account),
-            ('application', application),
-            ('data', data),
-            ('async', str(async)),
-            ('actionid', actionid),
-            ('channelid', channelid),
-            ('otherchannelid', otherchannelid),
-        ) if v is not None]
+
+        message = [(k, v) for (k, v) in (('action', 'originate'),
+                                         ('channel', channel),
+                                         ('context', context),
+                                         ('exten', exten),
+                                         ('priority', priority),
+                                         ('callerid', callerid),
+                                         ('account', account),
+                                         ('application', application),
+                                         ('data', data),
+                                         ('async', str(async)),
+                                         ('actionid', actionid),
+                                         ('channelid', channelid),
+                                         ('otherchannelid', otherchannelid)) if v is not None]
         if timeout is not None:
-            message.append(('timeout', timeout*1000))
+            message.append(('timeout', timeout * 1000))
+
         for var_name, var_value in variable.items():
-            message.append(('variable', '%s=%s' % (var_name, var_value)))
+            message.append(('variable', '{}={}'.format(var_name, var_value)))
+
         return self.sendDeferred(message).addCallback(self.errorUnlessResponse)
 
     def park(self, channel, channel2, timeout):
@@ -1110,17 +1122,24 @@ class AMIFactory(Factory):
     """
     log = Logger()
 
-    def __init__(self, service):
+    def __init__(self, service, log_lines_received = False, log_messages_sent = False,
+                 log_messages_received = False):
         self.service = service
+        self.log_lines_received = log_lines_received
+        self.log_messages_sent = log_messages_sent
+        self.log_messages_received = log_messages_received
 
     def buildProtocol(self, addr):
-        self.log.debug('Connected to {addr:}', addr = addr)
-        return AMIProtocol(self)
+        self.log.debug('Building AMI protocol for {addr:}', addr = addr)
+        return AMIProtocol(self, self.log_lines_received, self.log_messages_sent, self.log_messages_recived)
 
 class AMIService(object):
     def __init__(self, reactor, username, secret,
                  hostname = 'localhost', port = 5038, tls = False,
-                 plaintext_login = True, on_connected = None):
+                 plaintext_login = True, on_connected = None,
+                 log_lines_received = False, log_messages_sent = False,
+                 log_messages_received = False):
+
         self.reactor = reactor
         self.username = username
         self.secret = secret
@@ -1129,8 +1148,11 @@ class AMIService(object):
         self.tls = tls
         self.plaintext_login = plaintext_login
         self.on_connected = on_connected
+        self.log_lines_received = log_lines_received
+        self.log_messages_sent = log_messages_sent
+        self.log_messages_received = log_messages_received
 
-        self.factory = AMIFactory(self)
+        self.factory = AMIFactory(self, self.log_lines_received, self.log_messages_sent, self.log_messages_recived)
         self.endpoint = clientFromString(self.reactor,
                                          'tcp:host={}:port={}'.format(self.hostname, self.port))
         self.service = ClientService(self.endpoint, self.factory)

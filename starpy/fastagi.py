@@ -25,24 +25,22 @@ You use an asterisk FastAGI like this from extensions.conf:
 
 Where 127.0.0.1 is the server and 4573 is the port on which
 the server is listening.
-
-Module defines a standard Python logging module log 'FastAGI'
 """
-from twisted.internet import protocol
-from twisted.internet import reactor
-from twisted.internet import defer
+
+from twisted.internet.protocol import Factory
+from twisted.internet.defer import Deferred
+from twisted.internet.defer import maybeDeferred
 from twisted.internet.error import ConnectionDone
-from twisted.protocols import basic
+from twisted.protocols.basic import LineOnlyReceiver
 from twisted.logger import Logger
 
-import socket
 import time
 
 from .error import AGICommandFailure
 
 FAILURE_CODE = -1
 
-class FastAGIProtocol(basic.LineOnlyReceiver):
+class FastAGIProtocol(LineOnlyReceiver):
     """Protocol for the interfacing with the Asterisk FastAGI application
 
     Attributes:
@@ -89,8 +87,10 @@ class FastAGIProtocol(basic.LineOnlyReceiver):
 
     delimiter = b'\n'
 
-    def __init__(self, log_commands_sent = False, log_lines_received = False):
+    def __init__(self, on_connect = None, log_commands_sent = False, log_lines_received = False):
         """Initialise the AGIProtocol, arguments are ignored"""
+
+        self.on_connect = on_connect
         self.log_commands_sent = log_commands_sent
         self.log_lines_received = log_lines_received
         self.messageCache = []
@@ -104,12 +104,15 @@ class FastAGIProtocol(basic.LineOnlyReceiver):
 
         Initiates read of the initial attributes passed by the server
         """
+
         self.log.info('new connection')
         self.readingVariables = True
 
     def connectionLost(self, reason):
         """(Internal) Handle loss of the connection (remote hangup)"""
+
         self.log.info('connection lost')
+
         try:
             for df in self.pendingMessages:
                 df.errback(ConnectionDone('FastAGI connection lost'))
@@ -121,18 +124,21 @@ class FastAGIProtocol(basic.LineOnlyReceiver):
     def onClose(self):
         """Return a deferred which will fire when the connection is lost"""
         if not self.lostConnectionDeferred:
-            self.lostConnectionDeferred = defer.Deferred()
+            self.lostConnectionDeferred = Deferred()
         return self.lostConnectionDeferred
 
     def lineReceived(self, line):
         """(Internal) Handle Twisted's report of an incoming line from AMI"""
         if self.log_lines_received:
             self.log.debug('Line received: {line:}', line = repr(line))
+
         line = line.decode('utf-8')
+
         if self.readingVariables:
             if not line.strip():
                 self.readingVariables = False
-                self.factory.mainFunction(self)
+                if self.on_connect is not None:
+                    self.on_connect(self)
             else:
                 try:
                     key, value = line.split(':', 1)
@@ -167,7 +173,7 @@ class FastAGIProtocol(basic.LineOnlyReceiver):
         commandString = commandString.rstrip('\n').rstrip('\r').encode('utf-8')
         if self.log_commands_sent:
             self.log.info('Sending command: {commandString:}', commandString = commandString)
-        df = defer.Deferred()
+        df = Deferred()
         self.pendingMessages.append(df)
         self.sendLine(commandString)
         return df
@@ -185,30 +191,38 @@ class FastAGIProtocol(basic.LineOnlyReceiver):
 
     def resultAsInt(self, result):
         """(Internal) Convert result to an integer value"""
+
         try:
             return int(result.strip())
+
         except ValueError as err:
             raise AGICommandFailure(FAILURE_CODE, result)
 
     def secondResultItem(self, result):
         """(Internal) Retrieve the second item on the result-line"""
+
         return result.split(' ', 1)[1]
 
     def resultPlusTimeoutFlag(self, resultLine):
         """(Internal) Result followed by optional flag declaring timeout"""
+
         try:
             digits, timeout = resultLine.split(' ', 1)
             return digits.strip(), True
+
         except ValueError as err:
             return resultLine.strip(), False
 
     def dateAsSeconds(self, date):
         """(Internal) Convert date to asterisk-compatible format"""
+
         if hasattr(date, 'timetuple'):
             # XXX values seem to be off here...
             date = time.mktime(date.timetuple())
+
         elif isinstance(date, time.struct_time):
             date = time.mktime(date)
+
         return date
 
     def onRecordingComplete(self, resultLine):
@@ -216,10 +230,13 @@ class FastAGIProtocol(basic.LineOnlyReceiver):
 
         Also watch for failure-on-load problems
         """
+
         try:
             digit, exitType, endposStuff = resultLine.split(' ', 2)
+
         except ValueError as err:
             pass
+
         else:
             digit = int(digit)
             exitType = exitType.strip('()')
@@ -227,6 +244,7 @@ class FastAGIProtocol(basic.LineOnlyReceiver):
             if endposStuff.startswith('endpos='):
                 endpos = int(endposStuff[7:].strip())
                 return digit, exitType, endpos
+
         raise ValueError('Unexpected result on streaming completion: {}'.format(repr(resultLine)))
 
     def onStreamingComplete(self, resultLine, skipMS = 0):
@@ -234,10 +252,13 @@ class FastAGIProtocol(basic.LineOnlyReceiver):
 
         Also watch for failure-on-load problems
         """
+
         try:
             digit, endposStuff = resultLine.split(' ', 1)
+
         except ValueError as err:
             pass
+
         else:
             digit = int(digit)
             endposStuff = endposStuff.strip()
@@ -247,7 +268,9 @@ class FastAGIProtocol(basic.LineOnlyReceiver):
                     # "likely" an error according to the wiki,
                     # we'll raise an error...
                     raise AGICommandFailure(FAILURE_CODE, "End position {} == original position, result code {}".format(endpos, digit))
+
                 return digit, endpos
+
         raise ValueError('Unexpected result on streaming completion: {}'.format(repr(resultLine)))
 
     def jumpOnError(self, reason, difference = 100, forErrors = None):
@@ -267,15 +290,16 @@ class FastAGIProtocol(basic.LineOnlyReceiver):
         returns deferred from the InSequence of operations required to reset
         the address...
         """
+
         if forErrors:
             if not isinstance(forErrors, (tuple, list)):
                 forErrors = (forErrors,)
             reason.trap(*forErrors)
+
         sequence = InSequence()
         sequence.append(self.setContext, self.variables['agi_context'])
         sequence.append(self.setExtension, self.variables['agi_extension'])
-        sequence.append(self.setPriority, int(self.variables['agi_priority'])
-                                              + difference)
+        sequence.append(self.setPriority, int(self.variables['agi_priority']) + difference)
         sequence.append(self.finish)
         return sequence()
 
@@ -289,6 +313,7 @@ class FastAGIProtocol(basic.LineOnlyReceiver):
         Note: There *should* be a mechanism for sending a "result" code,
         but I haven't found any documentation for it.
         """
+
         self.transport.loseConnection()
 
     def answer(self):
@@ -296,6 +321,7 @@ class FastAGIProtocol(basic.LineOnlyReceiver):
 
         Returns deferred integer response code
         """
+
         d = self.sendCommand('ANSWER')
         d = d.addCallback(self.checkFailure)
         d = d.addCallback(self.resultAsInt)
@@ -319,6 +345,7 @@ class FastAGIProtocol(basic.LineOnlyReceiver):
         This could be used to decide if we can forward the channel to a given
         user, or whether we need to shunt them off somewhere else.
         """
+
         if channel is not None:
             command = 'CHANNEL STATUS "{}"'.format(channel)
         else:
@@ -358,6 +385,7 @@ class FastAGIProtocol(basic.LineOnlyReceiver):
         returns deferred (digit,endpos) on success, or errors on failure,
             note that digit will be 0 if no digit was pressed AFAICS
         """
+
         command = 'CONTROL STREAM FILE "{}" "{}" {} "{}" "{}"'.format(filename, escapeDigits, skipMS, ffChar, rewChar)
         if pauseChar:
             command += ' "{}"'.format(pauseChar)
@@ -374,7 +402,7 @@ class FastAGIProtocol(basic.LineOnlyReceiver):
         """
         command = 'DATABASE DEL "{}" "{}"'.format(family, key)
         d = self.sendCommand(command)
-        d = d.addCallback(self.checkFailure, failure='0')
+        d = d.addCallback(self.checkFailure, failure = '0')
         d = d.addCallback(self.resultAsInt)
         return d
 
@@ -383,11 +411,13 @@ class FastAGIProtocol(basic.LineOnlyReceiver):
 
         Returns deferred integer result code
         """
+
         command = 'DATABASE DELTREE "{}"'.format(family)
         if keyTree:
             command += ' "{}"'.format(keytree)
+
         d = self.sendCommand(command)
-        d = self.addCallback(self.checkFailure, failure='0')
+        d = self.addCallback(self.checkFailure, failure = '0')
         d = self.addCallback(self.resultAsInt)
         return d
 
@@ -415,9 +445,11 @@ class FastAGIProtocol(basic.LineOnlyReceiver):
 
         Returns deferred integer result code
         """
+
         command = 'DATABASE PUT "{}" "{}" "{}"'.format(family, key, value)
+
         d = self.sendCommand(command)
-        d = d.addCallback(self.checkFailure, failure='0')
+        d = d.addCallback(self.checkFailure, failure = '0')
         d = d.addCallback(self.resultAsInt)
         return d
 
@@ -436,6 +468,7 @@ class FastAGIProtocol(basic.LineOnlyReceiver):
         Returns deferred string result for the application, which
         may have failed, result values are application dependant.
         """
+
         command = 'EXEC "{}"'.format(application)
         if options:
             if kwargs.pop('comma_delimiter', False) is True:
@@ -446,7 +479,7 @@ class FastAGIProtocol(basic.LineOnlyReceiver):
             command += ' "{}"'.format(delimiter.join([str(x) for x in options]))
 
         d = self.sendCommand(command)
-        d = d.addCallback(self.checkFailure, failure='-2')
+        d = d.addCallback(self.checkFailure, failure = '-2')
         return d
 
     def getData(self, filename, timeout = 2.0, maxDigits = None):
@@ -465,7 +498,7 @@ class FastAGIProtocol(basic.LineOnlyReceiver):
             command += ' {}'.format(maxDigits)
 
         d = self.sendCommand(command)
-        d = d.addCallback(self.checkFailure, failure='-1')
+        d = d.addCallback(self.checkFailure)
         d = d.addCallback(self.resultPlusTimeoutFlag)
         return d
 
@@ -549,10 +582,11 @@ class FastAGIProtocol(basic.LineOnlyReceiver):
 
         Returns deferred string value for the key
         """
+
         def stripBrackets(value):
             return value.strip()[1:-1]
 
-        command = 'GET VARIABLE "%s"'.format(variable)
+        command = 'GET VARIABLE "{}"'.format(variable)
 
         d = self.sendCommand(command)
         d = d.addCallback(self.checkFailure, failure = '0')
@@ -565,25 +599,29 @@ class FastAGIProtocol(basic.LineOnlyReceiver):
 
         Returns deferred integer response code
         """
+
         command = 'HANGUP'
         if channel is not None:
             command += ' "{}"'.format(channel)
+
         d = self.sendCommand(command)
-        d = d.addCallback(self.checkFailure, failure='-1')
+        d = d.addCallback(self.checkFailure)
         d = d.addCallback(self.resultAsInt)
         return d
 
-    def noop(self, message=None):
+    def noop(self, message = None):
         """Send a null operation to the server.  Any message sent
         will be printed to the CLI.
 
         Returns deferred integer response code
         """
-        command = "NOOP"
+
+        command = 'NOOP'
         if message is not None:
             command += ' "{}"'.format(message)
+
         d = self.sendCommand(command)
-        d = d.addCallback(self.checkFailure, failure='-1')
+        d = d.addCallback(self.checkFailure)
         d = d.addCallback(self.resultAsInt)
         return d
 
@@ -601,15 +639,18 @@ class FastAGIProtocol(basic.LineOnlyReceiver):
 
         Returns deferred integer response code
         """
+
         try:
             option = {-1: 'skip', 0: 'noanswer', 1: 'answer'}[doAnswer]
         except KeyError:
             raise TypeError('doAnswer accepts values -1, 0, 1 only ({} given)'.format(doAnswer))
+
         command = 'PLAYBACK "{}"'.format(filename)
         if option:
             command += ' "{}"'.format(option)
+
         d = self.execute(command)
-        d = d.addCallback(self.checkFailure, failure='-1')
+        d = d.addCallback(self.checkFailure)
         d = d.addCallback(self.resultAsInt)
         return d
 
@@ -620,12 +661,14 @@ class FastAGIProtocol(basic.LineOnlyReceiver):
 
         returns deferred (char, bool(timeout))
         """
+
         command = 'RECEIVE CHAR'
         if timeout is not None:
             timeout *= 1000
             command += ' {}'.format(timeout)
+
         d = self.sendCommand(command)
-        d = d.addCallback(self.checkFailure, failure='-1')
+        d = d.addCallback(self.checkFailure)
         d = d.addCallback(self.resultPlusTimeoutFlag)
         return d
 
@@ -640,12 +683,13 @@ class FastAGIProtocol(basic.LineOnlyReceiver):
         if timeout is not None:
             timeout *= 1000
             command += ' {}'.format(timeout)
+
         d = self.sendCommand(command)
-        d = d.addCallback(self.checkFailure, failure='-1')
+        d = d.addCallback(self.checkFailure)
         return d
 
-    def recordFile(self, filename, format, escapeDigits, timeout=-1,
-                   offsetSamples=None, beep=True, silence=None):
+    def recordFile(self, filename, format, escapeDigits, timeout = -1,
+                   offsetSamples = None, beep = True, silence = None):
         """Record channel to given filename until escapeDigits or silence
 
         filename -- filename on the server to which to save
@@ -665,12 +709,16 @@ class FastAGIProtocol(basic.LineOnlyReceiver):
             dtmf, code=digits-pressed
             timeout, code='0'
         """
+
         timeout *= 1000
         command = 'RECORD FILE "{}" "{}" {} {}'.format(filename, format, escapeDigits, timeout)
+
         if offsetSamples is not None:
             command += ' {}'.format(offsetSamples)
+
         if beep:
             command += ' BEEP'
+
         if silence is not None:
             command += ' s={}'.format(silence)
 
@@ -684,11 +732,13 @@ class FastAGIProtocol(basic.LineOnlyReceiver):
         d = d.addCallback(self.onRecordingComplete)
         return d
 
-    def sayXXX(self, baseCommand, value, escapeDigits=''):
+    def sayXXX(self, baseCommand, value, escapeDigits = ''):
         """Underlying implementation for the common-api sayXXX functions"""
+
         command = '{} {} "{}"' % (baseCommand, value, escapeDigits or '')
+
         d = self.sendCommand(command)
-        d = d.addCallback(self.checkFailure, failure='-1')
+        d = d.addCallback(self.checkFailure)
         d = d.addCallback(self.resultAsInt)
         return d
 
@@ -697,6 +747,7 @@ class FastAGIProtocol(basic.LineOnlyReceiver):
 
         returns deferred 0 or the digit pressed
         """
+
         string = ''.join([x for x in string if x.isalnum()])
         return self.sayXXX('SAY ALPHA', string, escapeDigits)
 
@@ -707,6 +758,7 @@ class FastAGIProtocol(basic.LineOnlyReceiver):
 
         returns deferred 0 or digit-pressed as integer
         """
+
         return self.sayXXX('SAY DATE', self.dateAsSeconds(date), escapeDigits)
 
     def sayDigits(self, number, escapeDigits = None):
@@ -714,6 +766,7 @@ class FastAGIProtocol(basic.LineOnlyReceiver):
 
         returns deferred 0 or digit-pressed as integer
         """
+
         number = ''.join([x for x in str(number) if x.isdigit()])
         return self.sayXXX('SAY DIGITS', number, escapeDigits)
 
@@ -722,14 +775,16 @@ class FastAGIProtocol(basic.LineOnlyReceiver):
 
          returns deferred 0 or digit-pressed as integer
         """
+
         number = ''.join([x for x in str(number) if x.isdigit()])
         return self.sayXXX('SAY NUMBER', number, escapeDigits)
 
-    def sayPhonetic(self, string, escapeDigits=None):
+    def sayPhonetic(self, string, escapeDigits = None):
         """Say string using phonetics
 
          returns deferred 0 or digit-pressed as integer
         """
+
         string = ''.join([x for x in string if x.isalnum()])
         return self.sayXXX('SAY PHONETIC', string, escapeDigits)
 
@@ -738,6 +793,7 @@ class FastAGIProtocol(basic.LineOnlyReceiver):
 
          returns deferred 0 or digit-pressed as integer
         """
+
         return self.sayXXX('SAY TIME', self.dateAsSeconds(time), escapeDigits)
 
     def sayDateTime(self, time, escapeDigits = '', format = None, timezone = None):
@@ -768,13 +824,15 @@ class FastAGIProtocol(basic.LineOnlyReceiver):
 
         returns deferred 0 or digit-pressed as integer
         """
+
         command = 'SAY DATETIME {} "{}"'.format(self.dateAsSeconds(time), escapeDigits)
         if format is not None:
             command += ' {}'.format(format)
             if timezone is not None:
                 command += ' {}'.format(timezone)
+
         d = self.sendCommand(command)
-        d = d.addCallback(self.checkFailure, failure='-1')
+        d = d.addCallback(self.checkFailure)
         d = d.addCallback(self.resultAsInt)
         return d
 
@@ -783,9 +841,10 @@ class FastAGIProtocol(basic.LineOnlyReceiver):
 
         returns deferred integer result code
         """
+
         command = 'SEND IMAGE "{}"'.format(filename)
         d = self.sendCommand(command)
-        d = d.addCallback(self.checkFailure, failure='-1')
+        d = d.addCallback(self.checkFailure)
         d = d.addCallback(self.resultAsInt)
         return d
 
@@ -794,9 +853,10 @@ class FastAGIProtocol(basic.LineOnlyReceiver):
 
         returns deferred integer result code
         """
+
         command = 'SEND TEXT {}'.format(repr(text))
         d = self.sendCommand(command)
-        d = d.addCallback(self.checkFailure, failure='-1')
+        d = d.addCallback(self.checkFailure)
         d = d.addCallback(self.resultAsInt)
         return d
 
@@ -807,10 +867,12 @@ class FastAGIProtocol(basic.LineOnlyReceiver):
 
         returns deferred integer result code
         """
+
         command = 'SET AUTOHANGUP {}'.format(time)
+
         d = self.sendCommand(command)
         # docs don't show a failure case, actually
-        d = d.addCallback(self.checkFailure, failure = '-1')
+        d = d.addCallback(self.checkFailure)
         d = d.addCallback(self.resultAsInt)
         return d
 
@@ -820,6 +882,7 @@ class FastAGIProtocol(basic.LineOnlyReceiver):
         returns deferred integer result code
         """
         command = 'SET CALLERID {}'.format(number)
+
         d = self.sendCommand(command)
         d = d.addCallback(self.resultAsInt)
         return d
@@ -829,8 +892,11 @@ class FastAGIProtocol(basic.LineOnlyReceiver):
 
         returns deferred integer result code
         """
+
         command = 'SET CONTEXT {}'.format(context)
-        return self.sendCommand(command).addCallback(self.resultAsInt)
+        d = self.sendCommand(command)
+        d = d.addCallback(self.resultAsInt)
+        return d
 
     def setExtension(self, extension):
         """Move channel to given extension (or 'i' if invalid)
@@ -839,19 +905,23 @@ class FastAGIProtocol(basic.LineOnlyReceiver):
 
         returns deferred integer result code
         """
+
         command = 'SET EXTENSION {}'.format(extension)
+
         d = self.sendCommand(command)
         d = d.addCallback(self.resultAsInt)
         return d
 
-    def setMusic(self, on=True, musicClass=None):
+    def setMusic(self, on = True, musicClass = None):
         """Enable/disable and/or choose music class for channel's music-on-hold
 
         returns deferred integer result code
         """
+
         command = 'SET MUSIC {}'.format(['OFF', 'ON'][on])
         if musicClass is not None:
             command += ' {}'.format(musicClass)
+
         d = self.sendCommand(command)
         d = d.addCallback(self.resultAsInt)
         return d
@@ -861,7 +931,9 @@ class FastAGIProtocol(basic.LineOnlyReceiver):
 
         returns deferred integer result code
         """
+
         command = 'SET PRIORITY {}'.format(priority)
+
         d = self.sendCommand(command)
         d = d.addCallback(self.resultAsInt)
         return d
@@ -876,8 +948,10 @@ class FastAGIProtocol(basic.LineOnlyReceiver):
 
         returns deferred integer result code
         """
+
         value = '"{}"'.format(str(value).replace('"', ''))
         command = 'SET VARIABLE "{}" {}'.format(variable, value)
+
         d = self.sendCommand(command)
         d = d.addCallback(self.resultAsInt)
         return d
@@ -887,16 +961,17 @@ class FastAGIProtocol(basic.LineOnlyReceiver):
 
         returns deferred (str(digit), int(endpos)) for playback
         """
+
         command = 'STREAM FILE "{}" "{}"'.format(filename, escapeDigits)
         if offset is not None:
             command += ' {}'.format(offset)
 
         d = self.sendCommand(command)
-        d = d.addCallback(self.checkFailure, failure='-1')
+        d = d.addCallback(self.checkFailure)
         d = d.addCallback(self.onStreamingComplete, skipMS = offset)
         return d
 
-    def tddMode(self, on=True):
+    def tddMode(self, on = True):
         """Set TDD mode on the channel if possible (ZAP only ATM)
 
         on -- ON (True), OFF (False) or MATE (None)
@@ -905,21 +980,22 @@ class FastAGIProtocol(basic.LineOnlyReceiver):
         """
         if on is True:
             on = 'ON'
+
         elif on is False:
             on = 'OFF'
+
         elif on is None:
             on = 'MATE'
-        command = 'TDD MODE %s' % (on,)
-        return self.sendCommand(command).addCallback(
-            self.checkFailure, failure='-1',  # failure
-        ).addCallback(
-            # planned eventual failure case (not capable)
-            self.checkFailure, failure='0',
-        ).addCallback(
-            self.resultAsInt,
-        )
 
-    def verbose(self, message, level=None):
+        command = 'TDD MODE {}'.format(on)
+        d = self.sendCommand(command)
+        d = d.addCallback(self.checkFailure)
+        # planned eventual failure case (not capable)
+        d = d.addCallback(self.checkFailure, failure = '0')
+        d = d.addCallback(self.resultAsInt)
+        return d
+
+    def verbose(self, message, level = None):
         """Send a logging message to the asterisk console for debugging etc
 
         message -- text to pass
@@ -927,12 +1003,14 @@ class FastAGIProtocol(basic.LineOnlyReceiver):
 
         returns deferred integer result code
         """
-        command = 'VERBOSE %r' % (message,)
+
+        command = 'VERBOSE "{}"'.format(message)
         if level is not None:
-            command += ' %s' % (level)
-        return self.sendCommand(command).addCallback(
-            self.resultAsInt,
-        )
+            command += ' {}'.format(level)
+
+        d = self.sendCommand(command)
+        d = d.addCallback(self.resultAsInt)
+        return d
 
     def waitForDigit(self, timeout):
         """Wait up to timeout seconds for single digit to be pressed
@@ -943,36 +1021,25 @@ class FastAGIProtocol(basic.LineOnlyReceiver):
         returns deferred 0 on timeout or digit
         """
         timeout *= 1000
-        command = "WAIT FOR DIGIT %s" % (timeout,)
-        return self.sendCommand(command).addCallback(
-            self.checkFailure, failure='-1',
-        ).addCallback(
-            self.resultAsInt,
-        )
-
-    def wait(self, duration):
-        """Wait for X seconds
-
-        (just a wrapper around callLater, doesn't talk to server)
-
-        returns deferred which fires some time after duration seconds have
-        passed
-        """
-        df = defer.Deferred()
-        reactor.callLater(duration, df.callback, 0)
-        return df
-
+        command = 'WAIT FOR DIGIT {}'.format(timeout)
+        d = self.sendCommand(command)
+        d = d.addCallback(self.checkFailure)
+        d = d.addCallback(self.resultAsInt)
+        return d
 
 class InSequence(object):
     """Single-shot item creating a set of actions to run in sequence"""
+
+    log = Logger()
+
     def __init__(self):
         self.actions = []
         self.results = []
         self.finalDF = None
 
-    def append(self, function, *args, **named):
+    def append(self, function, *args, **kwargs):
         """Append an action to the set of actions to process"""
-        self.actions.append((function, args, named))
+        self.actions.append((function, args, kwargs))
 
     def __call__(self):
         """Return deferred that fires when finished processing all items"""
@@ -980,8 +1047,8 @@ class InSequence(object):
 
     def _doSequence(self):
         """Return a deferred that does each action in sequence"""
-        finalDF = defer.Deferred()
-        self.onActionSuccess(None, finalDF=finalDF)
+        finalDF = Deferred()
+        self.onActionSuccess(None, finalDF = finalDF)
         return finalDF
 
     def recordResult(self, result):
@@ -991,35 +1058,44 @@ class InSequence(object):
 
     def onActionSuccess(self, result, finalDF):
         """Handle individual-action success"""
+
         self.log.debug('onActionSuccess: {result:}', result = result)
         if self.actions:
-            action = self.actions.pop(0)
-            self.log.debug('action {action:}', action = action)
-            df = defer.maybeDeferred(action[0], *action[1], **action[2])
+            function, args, kwargs = self.actions.pop(0)
+            self.log.debug('action {function:}, {args:}, {kwargs:}', function = function, args = args, kwargs = kwargs)
+            df = maybeDeferred(function, *args, **kwargs)
             df.addCallback(self.recordResult)
-            df.addCallback(self.onActionSuccess, finalDF=finalDF)
-            df.addErrback(self.onActionFailure, finalDF=finalDF)
+            df.addCallback(self.onActionSuccess, finalDF = finalDF)
+            df.addErrback(self.onActionFailure, finalDF = finalDF)
             return df
+
         else:
             finalDF.callback(self.results)
 
     def onActionFailure(self, reason, finalDF):
         """Handle individual-action failure"""
-        self.log.debug('onActionFailure')
+
+        self.log.failure('onActionFailure', failure = reason)
         reason.results = self.results
         finalDF.errback(reason)
 
-
-class FastAGIFactory(protocol.Factory):
+class FastAGIFactory(Factory):
     """Factory generating FastAGI server instances
     """
-    protocol = FastAGIProtocol
     log = Logger()
 
-    def __init__(self, mainFunction):
+    def __init__(self, on_connect, log_commands_sent = False, log_lines_received = False):
         """Initialise the factory
 
         mainFunction -- function taking a connected FastAGIProtocol instance
             this is the function that's run when the Asterisk server connects.
         """
-        self.mainFunction = mainFunction
+        self.on_connect = on_connect
+        self.log_commands_sent = log_commands_sent
+        self.log_lines_received = log_lines_received
+
+    def buildProtocol(self, addr):
+        self.log.debug('building FastAGI protocol: {addr:}', addr = addr)
+        return FastAGIProtocol(on_connect = self.on_connect,
+                               log_commands_sent = self.log_commands_sent,
+                               log_lines_received = self.log_lines_received)
