@@ -842,8 +842,10 @@ class AMIProtocol(LineOnlyReceiver):
         }
         if membername is not None:
             message['membername'] = membername
+
         if stateinterface is not None:
             message['stateinterface'] = stateinterface
+
         return self.sendDeferred(message).addCallback(self.errorUnlessResponse)
 
     def queueLog(self, queue, event, uniqueid=None, interface=None, msg=None):

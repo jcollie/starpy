@@ -127,6 +127,9 @@ class FastAGIProtocol(LineOnlyReceiver):
             self.lostConnectionDeferred = Deferred()
         return self.lostConnectionDeferred
 
+    agi_variable_re = re.compile('^(agi_.*): (.*)$')
+    line_re = re.compile('^(\d{3})(-)?(?: result=(-?\d+) )?(.*)$')
+
     def lineReceived(self, line):
         """(Internal) Handle Twisted's report of an incoming line from AMI"""
         if self.log_lines_received:
@@ -135,18 +138,18 @@ class FastAGIProtocol(LineOnlyReceiver):
         line = line.decode('utf-8')
 
         if self.readingVariables:
-            if not line.strip():
+            if line == '':
                 self.readingVariables = False
                 if self.on_connect is not None:
                     self.on_connect(self)
             else:
-                try:
-                    key, value = line.split(':', 1)
-                    value = value[1:].rstrip('\n').rstrip('\r')
-                except ValueError as err:
+                match = self.agi_variable_re.match(line)
+                if not match:
                     self.log.error('Invalid variable line: {line:}', line = repr(line))
                 else:
-                    self.variables[key.lower()] = value
+                    key = match.group(1)
+                    value = match.group(2)
+                    self.variables[key] = value
                     self.log.debug('"{key:}" = "{value:}"', key = key, value = value)
         else:
             try:
