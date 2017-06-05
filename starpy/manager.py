@@ -87,13 +87,15 @@ class AMIProtocol(LineOnlyReceiver):
         self.log_messages_sent = log_messages_sent
         self.log_messages_received = log_messages_received
 
+        self.log.debug('AAAA')
+
         self.amiVersion = None
         self.messageCache = []
         self.actionIDCallbacks = {}
         self.eventTypeCallbacks = {}
         self.ami_id = str(uuid.uuid4())
 
-        self.log.debug('AAAA')
+        self.log.debug('BBBB')
 
     def registerEvent(self, event, function):
         """Register callback for the given event-type
