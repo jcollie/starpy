@@ -1136,7 +1136,9 @@ class AMIFactory(Factory):
 
     def buildProtocol(self, addr):
         self.log.debug('Building AMI protocol for {addr:}', addr = addr)
-        return AMIProtocol(self, log_lines_sent = self.log_lines_sent, log_lines_received = self.log_lines_received, log_messages_sent = self.log_messages_sent, log_messages_received = self.log_messages_recived)
+        p = AMIProtocol(self, log_lines_sent = self.log_lines_sent, log_lines_received = self.log_lines_received, log_messages_sent = self.log_messages_sent, log_messages_received = self.log_messages_recived)
+        self.log.debug('XXXX')
+        return p
 
 class AMIService(object):
     def __init__(self, reactor, username, secret,
