@@ -1152,7 +1152,7 @@ class AMIService(object):
         self.log_messages_sent = log_messages_sent
         self.log_messages_received = log_messages_received
 
-        self.factory = AMIFactory(self, self.log_lines_received, self.log_messages_sent, self.log_messages_recived)
+        self.factory = AMIFactory(self, self.log_lines_received, self.log_messages_sent, self.log_messages_received)
         self.endpoint = clientFromString(self.reactor,
                                          'tcp:host={}:port={}'.format(self.hostname, self.port))
         self.service = ClientService(self.endpoint, self.factory)
