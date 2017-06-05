@@ -129,7 +129,7 @@ class FastAGIProtocol(LineOnlyReceiver):
         return self.lostConnectionDeferred
 
     agi_variable_re = re.compile('^(agi_.*): (.*)$')
-    line_re = re.compile('^(\d{3})(-)?(?: result=(-?\d+) )?(.*)$')
+    line_re = re.compile('^(\d{3})(-)?(?: result=(-?\d+) ?)?(.*)$')
 
     def lineReceived(self, line):
         """(Internal) Handle Twisted's report of an incoming line from AMI"""
