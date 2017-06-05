@@ -297,8 +297,8 @@ class FastAGIProtocol(basic.LineOnlyReceiver):
         Returns deferred integer response code
         """
         d = self.sendCommand('ANSWER')
-        d = self.addCallback(self.checkFailure)
-        d = self.addCallback(self.resultAsInt)
+        d = d.addCallback(self.checkFailure)
+        d = d.addCallback(self.resultAsInt)
         return d
 
     def channelStatus(self, channel = None):
