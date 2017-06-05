@@ -38,7 +38,7 @@ from twisted.logger import Logger
 import socket
 import time
 
-from .error inport AGICommandFailure
+from .error import AGICommandFailure
 
 FAILURE_CODE = -1
 
