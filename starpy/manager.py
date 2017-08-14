@@ -27,6 +27,8 @@ for basic control of the channels active on a given Asterisk server.
 import sys
 import uuid
 
+from distutils.version import LooseVersion
+
 from hashlib import md5
 
 from twisted.application.internet import ClientService
@@ -489,7 +491,10 @@ class AMIProtocol(LineOnlyReceiver):
             'command': command
         }
         df = self.sendDeferred(message)
-        df.addCallback(self.errorUnlessResponse, expected='Follows')
+        if LooseVersion(self.amiVersion) > LooseVersion('2.7.0'):
+            df.addCallback(self.errorUnlessResponse)
+        else:
+            df.addCallback(self.errorUnlessResponse, expected='Follows')
 
         def onResult(message):
             if not isinstance(message, dict):
