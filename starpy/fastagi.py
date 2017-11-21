@@ -186,12 +186,18 @@ class FastAGIProtocol(LineOnlyReceiver):
 
         return data
 
+    result_re = re.compule('\Aresult=(\d+)\Z')
+
     def resultAsInt(self, result):
         """(Internal) Convert result to an integer value"""
         self.log.debug('result: {result:}', result = result)
 
         try:
-            return int(result.strip())
+            match = self.result_re.match(result)
+            if match:
+                return int(match.group(1))
+
+            raise AGICommandFailure(FAILURE_CODE, result)
 
         except ValueError as err:
             raise AGICommandFailure(FAILURE_CODE, result)
