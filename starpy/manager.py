@@ -361,7 +361,7 @@ class AMIProtocol(LineOnlyReceiver):
     def sendLine(self, line):
         if has_prometheus:
             lines_sent.inc()
-        super(self, AMIProtocol).sendLine(line.encode('utf-8'))
+        super(AMIProtocol, self).sendLine(line.encode('utf-8'))
 
     def sendMessage(self, message, responseCallback=None):
         """Send the message to the other side, return deferred for the result
