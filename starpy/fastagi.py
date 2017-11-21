@@ -3,7 +3,7 @@
 # StarPy -- Asterisk Protocols for Twisted
 #
 # Copyright © 2006, Michael C. Fletcher
-# Copyright © 2107, Jeffrey C. Ollie
+# Copyright © 2017, Jeffrey C. Ollie
 #
 # Michael C. Fletcher <mcfletch@vrplumber.com>
 # Jeffrey C. Ollie <jeff@ocjtech.us>
@@ -72,7 +72,7 @@ class FastAGIProtocol(LineOnlyReceiver):
                 agi_accountcode = ''
 
         # Internal:
-        readingVariables -- whether the instance is still in initialising by
+        reading_variables -- whether the instance is still in initialising by
             reading the setup variables from the connection
         messageCache -- stores incoming variables
         pendingMessages -- set of outstanding messages for which we expect
@@ -97,7 +97,7 @@ class FastAGIProtocol(LineOnlyReceiver):
         self.messageCache = []
         self.variables = {}
         self.pendingMessages = []
-        self.readingVariables = False
+        self.reading_variables = False
         self.lostConnectionDeferred = None
 
     def connectionMade(self):
@@ -107,7 +107,7 @@ class FastAGIProtocol(LineOnlyReceiver):
         """
 
         self.log.info('new connection')
-        self.readingVariables = True
+        self.reading_variables = True
 
     def connectionLost(self, reason):
         """(Internal) Handle loss of the connection (remote hangup)"""
@@ -129,7 +129,7 @@ class FastAGIProtocol(LineOnlyReceiver):
         return self.lostConnectionDeferred
 
     agi_variable_re = re.compile('^(agi_.*): (.*)$')
-    line_re = re.compile('^(\d{3})(-)?(?: result=(-?\d+) ?)?(.*)$')
+    line_re = re.compile('^(\d{3})\s+(.*)$')
 
     def lineReceived(self, line):
         """(Internal) Handle Twisted's report of an incoming line from AMI"""
@@ -138,9 +138,9 @@ class FastAGIProtocol(LineOnlyReceiver):
 
         line = line.decode('utf-8')
 
-        if self.readingVariables:
+        if self.reading_variables:
             if line == '':
-                self.readingVariables = False
+                self.reading_variables = False
                 if self.on_connect is not None:
                     self.on_connect(self)
             else:
@@ -153,20 +153,19 @@ class FastAGIProtocol(LineOnlyReceiver):
                     self.variables[key] = value
                     self.log.debug('"{key:}" = "{value:}"', key = key, value = value)
         else:
+            match = self.line_re.match(line)
+            code = match.group(1)
+            data = match.group(2)
+            self.log.debug('code: {code:} data: {data:}', code = code, data = repr(data))
             try:
                 df = self.pendingMessages.pop(0)
             except IndexError as err:
                 self.log.warn('Line received without pending deferred: {line:}', line = repr(line))
             else:
-                match = self.line_re.match(line)
-                code = match.group(1)
-                continuation = match.group(2)
-                result = int(match.group(3))
-                data = match.group(4)
                 if code == '200':
-                    df.callback((code, continuation, result, data))
+                    df.callback(data)
                 else:
-                    df.errback(AGICommandFailure(code, continuation, result, data))
+                    df.errback(AGICommandFailure(code, data))
 
     def sendCommand(self, commandString):
         """(Internal) Send the given command to the other side"""
@@ -189,6 +188,7 @@ class FastAGIProtocol(LineOnlyReceiver):
 
     def resultAsInt(self, result):
         """(Internal) Convert result to an integer value"""
+        self.log.debug('result: {result:}', result = result)
 
         try:
             return int(result.strip())
