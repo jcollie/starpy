@@ -212,8 +212,13 @@ class FastAGIProtocol(LineOnlyReceiver):
     def secondResultItem(self, result):
         """(Internal) Retrieve the second item on the result-line"""
 
-        self.log.debug('result: {result:}', result = result)
-        return result.split(' ', 1)[1]
+        match = self.result_re.match(result)
+        if match:
+            result = int(match.group(1))
+            data = match.group(2)
+            return data
+        raise AGICommandFailure(FAILURE_CODE, result)
+
 
     def resultPlusTimeoutFlag(self, resultLine):
         """(Internal) Result followed by optional flag declaring timeout"""
@@ -595,15 +600,10 @@ class FastAGIProtocol(LineOnlyReceiver):
         Returns deferred string value for the key
         """
 
-        def stripBrackets(value):
-            return value.strip()[1:-1]
-
         command = 'GET VARIABLE "{}"'.format(variable)
 
         d = self.sendCommand(command)
         d = d.addCallback(self.checkFailure, failure = '0')
-        d = d.addCallback(self.secondResultItem)
-        d = d.addCallback(stripBrackets)
         return d
 
     def hangup(self, channel = None):
