@@ -186,7 +186,7 @@ class FastAGIProtocol(LineOnlyReceiver):
 
         return data
 
-    result_re = re.compule('\Aresult=(\d+)\Z')
+    result_re = re.compile('\Aresult=(\d+)\Z')
 
     def resultAsInt(self, result):
         """(Internal) Convert result to an integer value"""
