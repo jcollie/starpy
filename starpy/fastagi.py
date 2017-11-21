@@ -217,6 +217,7 @@ class FastAGIProtocol(LineOnlyReceiver):
             result = int(match.group(1))
             data = match.group(2)
             return data
+
         raise AGICommandFailure(FAILURE_CODE, result)
 
 

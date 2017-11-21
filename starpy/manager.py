@@ -3,7 +3,7 @@
 # StarPy -- Asterisk Protocols for Twisted
 #
 # Copyright © 2006, Michael C. Fletcher
-# Copyright © 2107, Jeffrey C. Ollie
+# Copyright © 2017, Jeffrey C. Ollie
 #
 # Michael C. Fletcher <mcfletch@vrplumber.com>
 # Jeffrey C. Ollie <jeff@ocjtech.us>
@@ -39,6 +39,19 @@ from twisted.protocols.basic import LineOnlyReceiver
 from twisted.python.failure import Failure
 
 from .error import AMICommandFailure
+
+has_prometheus = False
+try:
+    from prometheus_client import Counter
+    lines_sent = Counter('ami_lines_sent','ami_lines_sent')
+    lines_received = Counter('ami_lines_received','ami_lines_sent')
+    messages_sent = Counter('ami_messages_sent', 'ami_messages_sent')
+    messages_received = Counter('ami_messages_received', 'ami_messages_received')
+    messages_discarded = Counter('ami_messages_discarded', 'ami_messages_discarded')
+    events_received = Counter('ami_events_received', 'ami_events_received')
+
+except ImportError:
+    has_prometheus = True
 
 class deferredErrorResp(Deferred):
     """A subclass of Deferred that adds a registerError method to handle
@@ -185,6 +198,8 @@ class AMIProtocol(LineOnlyReceiver):
 
     def lineReceived(self, line):
         """Handle Twisted's report of an incoming line from the manager"""
+        if has_prometheus:
+            lines_received.inc()
         if self.log_lines_received:
             self.log.debug('Line in: {line:}', line = repr(line))
         self.messageCache.append(line.decode('utf-8'))
@@ -268,6 +283,9 @@ class AMIProtocol(LineOnlyReceiver):
                         else:
                             message[key.lower().strip()] = value.strip()
 
+        if has_prometheus:
+            messages_received.inc()
+
         if self.log_messages_received:
             self.log.debug('Message received: {message:}', message = repr(message))
 
@@ -286,6 +304,8 @@ class AMIProtocol(LineOnlyReceiver):
 
     def dispatchEvent(self, event):
         """Given an incoming event, dispatch to registered handlers"""
+        if has_prometheus:
+            events_received.inc()
         for key in (event['event'], None):
             try:
                 handlers = self.eventTypeCallbacks[key]
@@ -338,11 +358,18 @@ class AMIProtocol(LineOnlyReceiver):
             pass
         return result
 
+    def sendLine(self, line):
+        if has_prometheus:
+            lines_sent.inc()
+        super(self, AMIProtocol).sendLine(line.encode('utf-8'))
+
     def sendMessage(self, message, responseCallback=None):
         """Send the message to the other side, return deferred for the result
 
         returns the actionid for the message
         """
+        if has_prometheus:
+            messages_sent.inc()
 
         if type(message) == list:
             actionid = None
@@ -358,7 +385,7 @@ class AMIProtocol(LineOnlyReceiver):
                 self.log.debug('Message out: {message:}', message = message)
             for item in message:
                 line = '{}: {}'.format(str(item[0].lower()), str(item[1]))
-                self.sendLine(line.encode('utf-8'))
+                self.sendLine(line)
         else:
             message = dict([(k.lower(), v) for (k, v) in message.items()])
             if 'actionid' not in message:
@@ -369,8 +396,8 @@ class AMIProtocol(LineOnlyReceiver):
                 self.log.debug('Message out: {message:}', message = message)
             for key, value in message.items():
                 line = '{}: {}'.format(str(key.lower()), str(value))
-                self.sendLine(line.encode('utf-8'))
-        self.sendLine(''.encode('utf-8'))
+                self.sendLine(line)
+        self.sendLine('')
         if type(message) == list:
             return actionid
         else:
