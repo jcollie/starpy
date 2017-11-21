@@ -135,6 +135,7 @@ class FastAGIProtocol(LineOnlyReceiver):
         """(Internal) Handle Twisted's report of an incoming line from AMI"""
         if self.log_lines_received:
             self.log.debug('Line received: {line:}', line = repr(line))
+        self.log.debug('Line received: {line:}', line = repr(line))
 
         line = line.decode('utf-8')
 
@@ -211,6 +212,7 @@ class FastAGIProtocol(LineOnlyReceiver):
     def secondResultItem(self, result):
         """(Internal) Retrieve the second item on the result-line"""
 
+        self.log.debug('result: {result:}', result = result)
         return result.split(' ', 1)[1]
 
     def resultPlusTimeoutFlag(self, resultLine):
