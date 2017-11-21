@@ -49,9 +49,10 @@ try:
     messages_received = Counter('ami_messages_received', 'ami_messages_received')
     messages_discarded = Counter('ami_messages_discarded', 'ami_messages_discarded')
     events_received = Counter('ami_events_received', 'ami_events_received')
+    has_prometheus = True
 
 except ImportError:
-    has_prometheus = True
+    pass
 
 class deferredErrorResp(Deferred):
     """A subclass of Deferred that adds a registerError method to handle
