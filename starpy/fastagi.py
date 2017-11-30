@@ -220,9 +220,9 @@ class FastAGIProtocol(LineOnlyReceiver):
 
         raise AGICommandFailure(FAILURE_CODE, result)
 
-    def resultPlusTimeoutFlag(self, resultLine):
+    def resultPlusTimeoutFlag(self, result):
         """(Internal) Result followed by optional flag declaring timeout"""
-        self.log.debug('XXX: {r:}', r = resultLine)
+        self.log.debug('XXX: {r:}', r = result)
         match = self.result_re.match(result)
         if match:
             result = int(match.group(1))
