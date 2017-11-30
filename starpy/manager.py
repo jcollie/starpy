@@ -43,12 +43,12 @@ from .error import AMICommandFailure
 has_prometheus = False
 try:
     from prometheus_client import Counter
-    lines_sent = Counter('ami_lines_sent','ami_lines_sent')
-    lines_received = Counter('ami_lines_received','ami_lines_sent')
-    messages_sent = Counter('ami_messages_sent', 'ami_messages_sent')
-    messages_received = Counter('ami_messages_received', 'ami_messages_received')
-    messages_discarded = Counter('ami_messages_discarded', 'ami_messages_discarded')
-    events_received = Counter('ami_events_received', 'ami_events_received')
+    lines_sent = Counter('ami_lines_sent','Number of lines sent to the Asterisk Manager Interface')
+    lines_received = Counter('ami_lines_received','Number of lines received from the Asterisk Manager Interface')
+    messages_sent = Counter('ami_messages_sent', 'Number of messages sent to the Asterisk Manager Interface')
+    messages_received = Counter('ami_messages_received', 'Number of messages received from the Asterisk Manager Interface')
+    messages_discarded = Counter('ami_messages_discarded', 'Number of messages that were discarded')
+    events_received = Counter('ami_events_received', 'Number of events that were received from the Asterisk Manager Interface')
     has_prometheus = True
 
 except ImportError:
