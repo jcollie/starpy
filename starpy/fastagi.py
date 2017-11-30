@@ -227,7 +227,7 @@ class FastAGIProtocol(LineOnlyReceiver):
         if match:
             result = int(match.group(1))
             data = match.group(2)
-            return data
+            return result, data
         #try:
         #    digits, timeout = resultLine.split(' ', 1)
         #    return digits.strip(), True
