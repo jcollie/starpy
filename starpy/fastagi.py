@@ -178,7 +178,7 @@ class FastAGIProtocol(LineOnlyReceiver):
         self.sendLine(commandString)
         return df
 
-    result_re = re.compile('\Aresult=(\d*)(?: \((.*)\))?\Z')
+    result_re = re.compile('\Aresult=(.*?)(?: \((.*)\))?\Z')
 
     def checkFailure(self, result, failure = -1):
         """(Internal) Check for a failure-code, raise error if == result"""
@@ -225,7 +225,7 @@ class FastAGIProtocol(LineOnlyReceiver):
         self.log.debug('XXX: {r:}', r = result)
         match = self.result_re.match(result)
         if match:
-            result = int(match.group(1))
+            result = match.group(1)
             data = match.group(2)
             return result, data == 'timeout'
 
