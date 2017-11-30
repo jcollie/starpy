@@ -267,10 +267,8 @@ class AMIProtocol(LineOnlyReceiver):
             if line:
                 if line.endswith(self.END_DATA):
                     # multi-line command results...
-                    message.setdefault(' ', []).extend([
-                        l for l in line.split('\n')
-                                if (l and l != self.END_DATA)
-                    ])
+                    line = line[0:-len(self.END_DATA)]
+                    message['output'] = '\r\n'.join(line.split('\n'))
                 else:
                     # regular line...
                     if line.startswith(self.VERSION_PREFIX):
@@ -284,7 +282,11 @@ class AMIProtocol(LineOnlyReceiver):
                             # VERSION_PREFIX from showing up in a data-set?
                             self.log.warn("Improperly formatted line received and ignored: {line:}", line = repr(line))
                         else:
-                            message[key.lower().strip()] = value.strip()
+                            key = key.lower().strip()
+                            if key in message:
+                                message[key] += '\r\n' + value.strip()
+                            else:
+                                message[key] = value.strip();
 
         if has_prometheus:
             messages_received.inc()
@@ -499,7 +501,7 @@ class AMIProtocol(LineOnlyReceiver):
         def onResult(message):
             if not isinstance(message, dict):
                 return message
-            return message[' ']
+            return message['output'].split ('\r\n')
 
         return df.addCallback(onResult)
 
