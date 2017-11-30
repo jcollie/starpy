@@ -1058,7 +1058,7 @@ class FastAGIProtocol(LineOnlyReceiver):
                 raise AGICommandFailure(FAILURE_CODE, line)
             if result == '0':
                 return None, True
-            return chr(int(result))
+            return chr(int(result)), False
 
         raise AGICommandFailure(FAILURE_CODE, line)
 
