@@ -220,16 +220,18 @@ class FastAGIProtocol(LineOnlyReceiver):
 
         raise AGICommandFailure(FAILURE_CODE, result)
 
-    def resultPlusTimeoutFlag(self, result):
+    def resultPlusTimeoutFlag(self, line):
         """(Internal) Result followed by optional flag declaring timeout"""
-        self.log.debug('XXX: {r:}', r = result)
-        match = self.result_re.match(result)
+        self.log.debug('XXX: {r:}', r = line)
+        match = self.result_re.match(line)
         if match:
             result = match.group(1)
             data = match.group(2)
+            if result == '-1':
+                raise AGICommandFailure(FAILURE_CODE, line)
             return result, data == 'timeout'
 
-        raise AGICommandFailure(FAILURE_CODE, result)
+        raise AGICommandFailure(FAILURE_CODE, line)
 
         #try:
         #    digits, timeout = resultLine.split(' ', 1)
@@ -1043,9 +1045,22 @@ class FastAGIProtocol(LineOnlyReceiver):
         timeout *= 1000
         command = 'WAIT FOR DIGIT {}'.format(timeout)
         d = self.sendCommand(command)
-        d = d.addCallback(self.checkFailure)
-        d = d.addCallback(self.resultAsInt)
+        d = d.addCallback(self.checkWaitForDigit)
         return d
+
+    def checkWaitForDigit(self, line):
+        self.log.debug('XXX: {r:}', r = line)
+        match = self.result_re.match(line)
+        if match:
+            result = match.group(1)
+            data = match.group(2)
+            if result == '-1':
+                raise AGICommandFailure(FAILURE_CODE, line)
+            if result == '0':
+                return None, True
+            return chr(int(result))
+
+        raise AGICommandFailure(FAILURE_CODE, line)
 
 class InSequence(object):
     """Single-shot item creating a set of actions to run in sequence"""
