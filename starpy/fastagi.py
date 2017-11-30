@@ -223,7 +223,7 @@ class FastAGIProtocol(LineOnlyReceiver):
 
     def resultPlusTimeoutFlag(self, resultLine):
         """(Internal) Result followed by optional flag declaring timeout"""
-
+        self.log.debug('XXX: {r:}', r = resultLine)
         try:
             digits, timeout = resultLine.split(' ', 1)
             return digits.strip(), True
