@@ -247,7 +247,7 @@ class AMIProtocol(LineOnlyReceiver):
         self.log.info('connection lost')
         for key, callable in self.actionIDCallbacks.items():
             try:
-                callable(ConnectionDone("FastAGI connection terminated"))
+                callable(ConnectionDone("Manager connection terminated"))
             except Exception as err:
                 self.log.error("Failure during connectionLost for callable {callable:}: {err:}",
                                callable = callable, err = err)
@@ -1209,8 +1209,11 @@ class AMIService(object):
                                   log_lines_received = self.log_lines_received,
                                   log_messages_sent = self.log_messages_sent,
                                   log_messages_received = self.log_messages_received)
-        self.endpoint = clientFromString(self.reactor,
-                                         'tcp:host={}:port={}'.format(self.hostname, self.port))
+        if self.tls:
+            client_string = 'tls:host={}:port={}'.format(self.hostname, self.port)
+        else:
+            client_string = 'tcp:host={}:port={}'.format(self.hostname, self.port)
+        self.endpoint = clientFromString(self.reactor, client_string)
         self.service = ClientService(self.endpoint, self.factory)
         self.service.setName('Asterisk Manager Interface')
         self.service.startService()
