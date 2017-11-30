@@ -220,16 +220,20 @@ class FastAGIProtocol(LineOnlyReceiver):
 
         raise AGICommandFailure(FAILURE_CODE, result)
 
-
     def resultPlusTimeoutFlag(self, resultLine):
         """(Internal) Result followed by optional flag declaring timeout"""
         self.log.debug('XXX: {r:}', r = resultLine)
-        try:
-            digits, timeout = resultLine.split(' ', 1)
-            return digits.strip(), True
+        match = self.result_re.match(result)
+        if match:
+            result = int(match.group(1))
+            data = match.group(2)
+            return data
+        #try:
+        #    digits, timeout = resultLine.split(' ', 1)
+        #    return digits.strip(), True
 
-        except ValueError as err:
-            return resultLine.strip(), False
+        #except ValueError as err:
+        #    return resultLine.strip(), False
 
     def dateAsSeconds(self, date):
         """(Internal) Convert date to asterisk-compatible format"""
@@ -516,7 +520,7 @@ class FastAGIProtocol(LineOnlyReceiver):
             command += ' {}'.format(maxDigits)
 
         d = self.sendCommand(command)
-        d = d.addCallback(self.checkFailure)
+        #d = d.addCallback(self.checkFailure)
         d = d.addCallback(self.resultPlusTimeoutFlag)
         return d
 
