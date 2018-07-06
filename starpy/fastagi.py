@@ -177,7 +177,7 @@ class FastAGIProtocol(LineOnlyReceiver):
         self.sendLine(commandString)
         return df
 
-    result_re = re.compile('\Aresult=(.*?)(?: \((.*)\))?\Z')
+    result_re = re.compile('\Aresult=(\d+)(?: \((.*)\))?\Z')
 
     def checkFailure(self, result, failure = -1):
         """(Internal) Check for a failure-code, raise error if == result"""
