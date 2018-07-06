@@ -350,7 +350,7 @@ class FastAGIProtocol(LineOnlyReceiver):
 
         d = self.sendCommand('ANSWER')
         d = d.addCallback(self.checkFailure)
-        d = d.addCallback(self.resultAsInt)
+        #d = d.addCallback(self.resultAsInt)
         return d
 
     def channelStatus(self, channel = None):
