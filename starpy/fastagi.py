@@ -135,7 +135,6 @@ class FastAGIProtocol(LineOnlyReceiver):
         """(Internal) Handle Twisted's report of an incoming line from AMI"""
         if self.log_lines_received:
             self.log.debug('Line received: {line:}', line = repr(line))
-        self.log.debug('Line received: {line:}', line = repr(line))
 
         line = line.decode('utf-8')
 
