@@ -627,7 +627,7 @@ class FastAGIProtocol(LineOnlyReceiver):
 
         d = self.sendCommand(command)
         d = d.addCallback(self.checkFailure)
-        d = d.addCallback(self.resultAsInt)
+        #d = d.addCallback(self.resultAsInt)
         return d
 
     def noop(self, message = None):
@@ -643,7 +643,7 @@ class FastAGIProtocol(LineOnlyReceiver):
 
         d = self.sendCommand(command)
         d = d.addCallback(self.checkFailure)
-        d = d.addCallback(self.resultAsInt)
+        #d = d.addCallback(self.resultAsInt)
         return d
 
     def playback(self, filename, doAnswer = 1):
@@ -672,7 +672,7 @@ class FastAGIProtocol(LineOnlyReceiver):
 
         d = self.execute(command)
         d = d.addCallback(self.checkFailure)
-        d = d.addCallback(self.resultAsInt)
+        #d = d.addCallback(self.resultAsInt)
         return d
 
     def receiveChar(self, timeout = None):
@@ -760,7 +760,7 @@ class FastAGIProtocol(LineOnlyReceiver):
 
         d = self.sendCommand(command)
         d = d.addCallback(self.checkFailure)
-        d = d.addCallback(self.resultAsInt)
+        #d = d.addCallback(self.resultAsInt)
         return d
 
     def sayAlpha(self, string, escapeDigits = None):
@@ -854,7 +854,7 @@ class FastAGIProtocol(LineOnlyReceiver):
 
         d = self.sendCommand(command)
         d = d.addCallback(self.checkFailure)
-        d = d.addCallback(self.resultAsInt)
+        #d = d.addCallback(self.resultAsInt)
         return d
 
     def sendImage(self, filename):
@@ -866,7 +866,7 @@ class FastAGIProtocol(LineOnlyReceiver):
         command = 'SEND IMAGE "{}"'.format(filename)
         d = self.sendCommand(command)
         d = d.addCallback(self.checkFailure)
-        d = d.addCallback(self.resultAsInt)
+        #d = d.addCallback(self.resultAsInt)
         return d
 
     def sendText(self, text):
@@ -878,7 +878,7 @@ class FastAGIProtocol(LineOnlyReceiver):
         command = 'SEND TEXT {}'.format(repr(text))
         d = self.sendCommand(command)
         d = d.addCallback(self.checkFailure)
-        d = d.addCallback(self.resultAsInt)
+        #d = d.addCallback(self.resultAsInt)
         return d
 
     def setAutoHangup(self, time):
@@ -894,7 +894,7 @@ class FastAGIProtocol(LineOnlyReceiver):
         d = self.sendCommand(command)
         # docs don't show a failure case, actually
         d = d.addCallback(self.checkFailure)
-        d = d.addCallback(self.resultAsInt)
+        #d = d.addCallback(self.resultAsInt)
         return d
 
     def setCallerID(self, number):
