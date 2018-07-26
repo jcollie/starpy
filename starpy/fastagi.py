@@ -155,7 +155,7 @@ class FastAGIProtocol(LineOnlyReceiver):
         else:
             match = self.line_re.match(line)
             if match is None:
-                self.log.warning('Unexpected line: {line:}', line = line)
+                self.log.warn('Unexpected line: {line:}', line = line)
                 return
 
             code = match.group(1)
