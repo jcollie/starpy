@@ -177,16 +177,16 @@ class FastAGIProtocol(LineOnlyReceiver):
         self.sendLine(commandString)
         return df
 
-    result_re = re.compile('\Aresult=(.*?)(?: \((.*)\))?\Z')
+    result_re = re.compile('\Aresult=(.*?)(?: (.*))?\Z')
 
     def checkFailure(self, result, failure = -1):
         """(Internal) Check for a failure-code, raise error if == result"""
-
+        self.log.debug('result: {result:}', result = result)
         match = self.result_re.match(result)
         if match:
             result_code = int(match.group(1))
             result_data = match.group(2)
-            if result == failure:
+            if result_code == failure:
                 raise AGICommandFailure(FAILURE_CODE, result)
 
             return result
