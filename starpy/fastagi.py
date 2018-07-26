@@ -273,31 +273,34 @@ class FastAGIProtocol(LineOnlyReceiver):
 
         raise ValueError('Unexpected result on streaming completion: {}'.format(repr(resultLine)))
 
-    def onStreamingComplete(self, resultLine, skipMS = 0):
+    endpos_re = re.compile('endpos=(\d+)')
+
+    def onStreamingComplete(self, result, skipMS = 0):
         """(Internal) Handle putative success
 
         Also watch for failure-on-load problems
         """
 
-        try:
-            digit, endposStuff = resultLine.split(' ', 1)
+        self.log.debug('result: {result:}', result = result)
 
-        except ValueError as err:
-            pass
+        match = self.result_re.match(result)
+        if not match:
+            raise AGICommandFailure(FAILURE_CODE, "result line doesn't match")
 
-        else:
-            digit = int(digit)
-            endposStuff = endposStuff.strip()
-            if endposStuff.startswith('endpos='):
-                endpos = int(endposStuff[7:].strip())
-                if endpos == skipMS:
-                    # "likely" an error according to the wiki,
-                    # we'll raise an error...
-                    raise AGICommandFailure(FAILURE_CODE, "End position {} == original position, result code {}".format(endpos, digit))
+        result_code = int(match.group(1))
+        result_data = match.group(2)
 
-                return digit, endpos
+        match = self.endpos_re.search(result_data)
+        if not match:
+            raise AGICommandFailure(FAILURE_CODE, "no endpos")
 
-        raise ValueError('Unexpected result on streaming completion: {}'.format(repr(resultLine)))
+        endpos = int(match.group(1))
+        if endpos == skipMS:
+            # "likely" an error according to the wiki,
+            # we'll raise an error...
+            raise AGICommandFailure(FAILURE_CODE, "End position {} == original position, result code {}".format(endpos, result_code))
+
+        return result_code, endpos
 
     def jumpOnError(self, reason, difference = 100, forErrors = None):
         """On error, jump to original priority+100
