@@ -279,7 +279,7 @@ class FastAGIProtocol(LineOnlyReceiver):
 
     endpos_re = re.compile('endpos=(\d+)')
 
-    def onStreamingComplete(self, result, skip_ms = 0):
+    def onStreamingComplete(self, result, skipMS = 0):
         """(Internal) Handle putative success
 
         Also watch for failure-on-load problems
@@ -299,7 +299,7 @@ class FastAGIProtocol(LineOnlyReceiver):
             raise AGICommandFailure(FAILURE_CODE, "no endpos")
 
         endpos = int(match.group(1))
-        if endpos == skip_ms:
+        if endpos == skipMS:
             # "likely" an error according to the wiki,
             # we'll raise an error...
             raise AGICommandFailure(FAILURE_CODE, "End position {} == original position, result code {}".format(endpos, result_code))
