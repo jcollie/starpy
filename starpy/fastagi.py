@@ -154,6 +154,10 @@ class FastAGIProtocol(LineOnlyReceiver):
                     self.log.debug('"{key:}" = "{value:}"', key = key, value = value)
         else:
             match = self.line_re.match(line)
+            if match is None:
+                self.log.warning('Unexpected line: {line:}', line = line)
+                return
+
             code = match.group(1)
             data = match.group(2)
             self.log.debug('code: {code:} data: {data:}', code = code, data = repr(data))
@@ -275,7 +279,7 @@ class FastAGIProtocol(LineOnlyReceiver):
 
     endpos_re = re.compile('endpos=(\d+)')
 
-    def onStreamingComplete(self, result, skipMS = 0):
+    def onStreamingComplete(self, result, skip_ms = 0):
         """(Internal) Handle putative success
 
         Also watch for failure-on-load problems
@@ -295,7 +299,7 @@ class FastAGIProtocol(LineOnlyReceiver):
             raise AGICommandFailure(FAILURE_CODE, "no endpos")
 
         endpos = int(match.group(1))
-        if endpos == skipMS:
+        if endpos == skip_ms:
             # "likely" an error according to the wiki,
             # we'll raise an error...
             raise AGICommandFailure(FAILURE_CODE, "End position {} == original position, result code {}".format(endpos, result_code))
