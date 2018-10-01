@@ -616,11 +616,16 @@ class FastAGIProtocol(LineOnlyReceiver):
         Returns deferred string value for the key
         """
 
+        def returnValue(resultLine):
+            # get the second item without the brackets...
+            return resultLine[1:-1]
+
         command = 'GET VARIABLE "{}"'.format(variable)
 
         d = self.sendCommand(command)
         d = d.addCallback(self.checkFailure, failure = '0')
         d = d.addCallback(self.secondResultItem)
+        d = d.addCallback(self.returnValue)
         return d
 
     def hangup(self, channel = None):
