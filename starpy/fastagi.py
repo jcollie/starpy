@@ -620,6 +620,7 @@ class FastAGIProtocol(LineOnlyReceiver):
 
         d = self.sendCommand(command)
         d = d.addCallback(self.checkFailure, failure = '0')
+        d = d.addCallback(self.secondResultItem)
         return d
 
     def hangup(self, channel = None):
